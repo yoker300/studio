@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -44,6 +44,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   const context = useContext(AppContext);
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const {
     control,
@@ -76,6 +77,8 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           urgent: item.urgent,
           gf: item.gf,
         });
+        // For editing, focus the name input for quick changes.
+        setTimeout(() => nameInputRef.current?.focus(), 100);
       } else {
         reset({
           icon: '🛒',
@@ -89,6 +92,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       }
     }
   }, [item, isOpen, reset]);
+
 
   if (!context) return null;
   const { addItemToList, updateItemInList, settings } = context;
@@ -136,27 +140,32 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
             <DialogTitle>{item ? 'Edit Item' : 'Add Item'}</DialogTitle>
           </DialogHeader>
 
-          <div className="flex items-center gap-2 my-4">
+          <div className="flex items-center gap-2 my-3">
             <Controller
               name="icon"
               control={control}
               render={({ field }) => (
-                <Input {...field} className="text-3xl w-16 h-16 p-0 text-center bg-muted" maxLength={2} />
+                <Input {...field} className="text-3xl w-14 h-14 p-0 text-center bg-muted" maxLength={2} />
               )}
             />
             <Controller
               name="name"
               control={control}
               render={({ field }) => (
-                <Input {...field} placeholder="Item Name" className="text-2xl font-headline font-bold h-16 flex-1" />
+                <Input
+                  {...field}
+                  ref={nameInputRef}
+                  placeholder="Item Name"
+                  className="text-2xl font-headline font-bold h-14 flex-1"
+                />
               )}
             />
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Quantity */}
-            <div className="p-3 bg-muted rounded-lg">
-              <label className="text-sm font-medium text-muted-foreground">Quantity</label>
+            <div className="p-2 bg-muted rounded-lg">
+              <label className="text-sm font-bold text-foreground">Quantity</label>
               {smartQuantityRule ? (
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {smartQuantityRule.quantities.map(q => (
@@ -167,15 +176,15 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               ) : (
                 <div className="flex items-center gap-2 mt-2">
                   <Button type="button" size="icon" variant="outline" onClick={() => setValue('qty', Math.max(1, watchedQty - 1))}><Minus className="h-4 w-4" /></Button>
-                  <Controller name="qty" control={control} render={({ field }) => <Input {...field} type="number" className="w-20 text-center text-lg" onChange={e => field.onChange(parseInt(e.target.value) || 1)} />} />
+                  <Controller name="qty" control={control} render={({ field }) => <Input {...field} type="number" className="w-16 text-center text-lg" onChange={e => field.onChange(parseInt(e.target.value) || 1)} />} />
                   <Button type="button" size="icon" variant="outline" onClick={() => setValue('qty', watchedQty + 1)}><Plus className="h-4 w-4" /></Button>
                 </div>
               )}
             </div>
 
             {/* Store */}
-            <div className="p-3 bg-muted rounded-lg">
-                <label className="text-sm font-medium text-muted-foreground">Store</label>
+            <div className="p-2 bg-muted rounded-lg">
+                <label className="text-sm font-bold text-foreground">Store</label>
                 <Controller name="store" control={control} render={({ field }) => <Input {...field} placeholder="Any Store" className="mt-1 bg-background" />} />
                 <div className="flex gap-2 overflow-x-auto mt-2 pb-2">
                   {settings.storePresets.map(preset => (
@@ -186,20 +195,20 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
             
             {/* Toggles */}
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" variant={watchedUrgent ? 'destructive' : 'outline'} className="h-16 flex flex-col gap-1" onClick={() => setValue('urgent', !watchedUrgent)}>
-                  <Zap/> Urgent
+              <Button type="button" variant={watchedUrgent ? 'destructive' : 'outline'} className="h-14 flex flex-col gap-1" onClick={() => setValue('urgent', !watchedUrgent)}>
+                  <Zap size={20}/> Urgent
               </Button>
-              <Button type="button" variant={watchedGf ? 'secondary' : 'outline'} className={cn("h-16 flex flex-col gap-1", watchedGf && 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300')} onClick={() => setValue('gf', !watchedGf)}>
-                  <WheatOff/> Gluten Free
+              <Button type="button" variant={watchedGf ? 'secondary' : 'outline'} className={cn("h-14 flex flex-col gap-1", watchedGf && 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300')} onClick={() => setValue('gf', !watchedGf)}>
+                  <WheatOff size={20}/> Gluten Free
               </Button>
             </div>
             
             {/* Notes */}
-            <Controller name="notes" control={control} render={({ field }) => <Textarea {...field} placeholder="Notes (e.g., Brand X, low fat)..." />} />
+            <Controller name="notes" control={control} render={({ field }) => <Textarea {...field} placeholder="Notes (e.g., Brand X, low fat)..." rows={2}/>} />
 
           </div>
 
-          <DialogFooter className="mt-6 sm:justify-between gap-2">
+          <DialogFooter className="mt-4 sm:justify-between gap-2">
             <DialogClose asChild>
               <Button type="button" variant="secondary">Cancel</Button>
             </DialogClose>
