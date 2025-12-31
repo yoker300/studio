@@ -5,13 +5,9 @@ import { AppContext } from '@/context/AppContext';
 import RecipeCard from '../cards/RecipeCard';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-
 
 const RecipesView = () => {
   const context = useContext(AppContext);
-  const { toast } = useToast();
-
   if (!context) return null;
 
   const { recipes, navigate } = context;

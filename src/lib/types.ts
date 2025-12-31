@@ -1,3 +1,5 @@
+import { GenerateRecipeOutput } from "@/ai/flows/ai-generate-recipe";
+
 export type Item = {
   id: string;
   name: string;
@@ -51,4 +53,6 @@ export type View =
   | { type: 'addList' }
   | { type: 'editList'; listId: string }
   | { type: 'addRecipe' }
-  | { type: 'editRecipe'; recipeId: string };
+  | { type: 'editRecipe'; recipeId?: string };
+
+export type GeneratedRecipe = GenerateRecipeOutput;

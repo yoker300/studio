@@ -7,7 +7,6 @@ import * as z from 'zod';
 import { AppContext } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +39,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
   const { toast } = useToast();
   const isEditing = !!recipeId;
   const recipe = context?.recipes.find(r => r.id === recipeId);
+  const generatedRecipe = context?.generatedRecipe;
 
   const {
     control,
@@ -52,7 +52,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
     defaultValues: {
       name: '',
       icon: '🍲',
-      image: PlaceHolderImages[0]?.imageUrl || 'https://picsum.photos/seed/newrecipe/600/400',
+      image: PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]?.imageUrl || 'https://picsum.photos/seed/newrecipe/600/400',
       ingredients: []
     }
   });
@@ -77,11 +77,18 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
         image: recipe.image,
         ingredients: ingredientData,
       });
+    } else if (!isEditing && generatedRecipe) {
+        reset({
+            name: generatedRecipe.name,
+            icon: generatedRecipe.icon,
+            image: PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]?.imageUrl || 'https://picsum.photos/seed/newrecipe/600/400',
+            ingredients: generatedRecipe.ingredients.map(ing => ({ ...ing, id: uuidv4() })),
+        })
     }
-  }, [isEditing, recipe, reset]);
+  }, [isEditing, recipe, generatedRecipe, reset]);
 
   if (!context) return null;
-  const { addRecipe, updateRecipe, navigate } = context;
+  const { addRecipe, updateRecipe, navigate, clearGeneratedRecipe } = context;
 
   const onSubmit = (data: RecipeFormData) => {
     const recipeData = {
@@ -103,6 +110,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
       addRecipe(recipeData);
       toast({ title: 'Recipe Created', description: `"${data.name}" has been added.` });
     }
+    clearGeneratedRecipe();
   };
   
   const handleBack = () => {
@@ -111,6 +119,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
     } else {
       navigate({ type: 'recipes' });
     }
+    clearGeneratedRecipe();
   }
 
   return (
@@ -126,7 +135,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
         <Card className="max-w-xl mx-auto">
           <CardHeader>
             <CardTitle>Recipe Details</CardTitle>
-            <CardDescription>Fill out the information for your recipe.</CardDescription>
+            <CardDescription>{isEditing ? 'Update the information for your recipe.' : 'Review and save your generated recipe.'}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Basic Info */}

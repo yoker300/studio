@@ -4,6 +4,7 @@ import { createContext, useState, useEffect, ReactNode, useCallback } from 'reac
 import { List, Recipe, Settings, Item, View } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
 import { autoCorrectItem } from '@/ai/flows/ai-auto-correct-item';
+import { GenerateRecipeOutput } from '@/ai/flows/ai-generate-recipe';
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_SETTINGS: Settings = {
@@ -29,7 +30,7 @@ const DUMMY_RECIPES: Recipe[] = [
       ],
     },
     {
-      id: 'recipe-2', name: 'Sushi', icon: '🍣', image: 'https://picsum.photos/seed/recipe2/600/400',
+      id: 'recipe-2', name: 'Sushi', icon: '🍣', image: 'https://picsum.photos/seed/sushi/600/400',
       ingredients: [
         { id: uuidv4(), name: 'Sushi Rice', qty: 2, category: 'Pantry', checked: false, notes: 'cups', store: '', urgent: false, gf: true, icon: '🍚' },
         { id: uuidv4(), name: 'Nori', qty: 5, category: 'Pantry', checked: false, notes: 'sheets', store: '', urgent: false, gf: true, icon: '🌿' },
@@ -46,6 +47,7 @@ type AppContextType = {
   currentView: View;
   activeTab: 'lists' | 'recipes' | 'settings';
   urgentMode: boolean;
+  generatedRecipe: GenerateRecipeOutput | null;
   navigate: (view: View) => void;
   vibrate: () => void;
   addList: (name: string, icon: string) => void;
@@ -62,6 +64,8 @@ type AppContextType = {
   deleteRecipe: (recipeId: string) => void;
   addRecipeToList: (recipeId: string, listId: string) => void;
   updateSettings: (newSettings: Partial<Settings>) => void;
+  setGeneratedRecipe: (recipe: GenerateRecipeOutput | null) => void;
+  clearGeneratedRecipe: () => void;
 };
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -100,6 +104,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = usePersistentState<Settings>('smartlist_settings', DEFAULT_SETTINGS);
   const [currentView, setCurrentView] = useState<View>({ type: 'lists' });
   const [urgentMode, setUrgentMode] = usePersistentState('smartlist_urgentMode', false);
+  const [generatedRecipe, setGeneratedRecipe] = useState<GenerateRecipeOutput | null>(null);
   const { toast } = useToast();
 
   const activeTab = currentView.type.includes('list') ? 'lists' : currentView.type.includes('recipe') ? 'recipes' : 'settings';
@@ -113,6 +118,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const navigate = (view: View) => {
     vibrate();
     setCurrentView(view);
+  };
+
+  const clearGeneratedRecipe = () => {
+    setGeneratedRecipe(null);
   };
 
   const addList = (name: string, icon: string) => {
@@ -284,6 +293,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentView,
     activeTab,
     urgentMode,
+    generatedRecipe,
     navigate,
     vibrate,
     addList,
@@ -300,6 +310,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteRecipe,
     addRecipeToList,
     updateSettings,
+    setGeneratedRecipe,
+    clearGeneratedRecipe,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -11,6 +11,7 @@ import SettingsView from './views/SettingsView';
 import AddListView from './views/AddListView';
 import EditListView from './views/EditListView';
 import EditRecipeView from './views/EditRecipeView';
+import GenerateRecipeView from './views/GenerateRecipeView';
 
 const PhoneExperience = () => {
   const context = useContext(AppContext);
@@ -36,7 +37,7 @@ const PhoneExperience = () => {
       case 'editList':
         return <EditListView listId={currentView.listId} />;
       case 'addRecipe':
-        return <EditRecipeView />;
+        return <GenerateRecipeView />;
       case 'editRecipe':
         return <EditRecipeView recipeId={currentView.recipeId} />;
       default:
