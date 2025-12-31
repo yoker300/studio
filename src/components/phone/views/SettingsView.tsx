@@ -14,13 +14,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { SmartQuantity } from '@/lib/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const SettingsView = () => {
   const context = useContext(AppContext);
   const { toast } = useToast();
   const [newStore, setNewStore] = useState('');
+  
+  // State for adding new smart quantity
+  const [newSQItemName, setNewSQItemName] = useState('');
+  const [newSQQuantities, setNewSQQuantities] = useState('');
+
+  // State for editing a smart quantity
+  const [editingSQ, setEditingSQ] = useState<SmartQuantity | null>(null);
+  const [editingSQName, setEditingSQName] = useState('');
+  const [editingSQQuantities, setEditingSQQuantities] = useState('');
 
   if (!context) return null;
   const { settings, updateSettings } = context;
@@ -40,6 +61,55 @@ const SettingsView = () => {
     // In a real app, this would hit an API
     toast({ title: "Profile Saved!", description: "Your profile details have been updated." });
   }
+
+  const handleSQAdd = () => {
+    if (!newSQItemName || !newSQQuantities) {
+        toast({ variant: 'destructive', title: 'Missing Info', description: 'Please provide both an item name and quantities.' });
+        return;
+    }
+    const quantities = newSQQuantities.split(',').map(q => parseInt(q.trim())).filter(q => !isNaN(q) && q > 0);
+    if (quantities.length === 0) {
+        toast({ variant: 'destructive', title: 'Invalid Quantities', description: 'Please provide a comma-separated list of numbers.' });
+        return;
+    }
+
+    const newSQ = { itemName: newSQItemName, quantities };
+    updateSettings({ smartQuantities: [...settings.smartQuantities, newSQ] });
+    setNewSQItemName('');
+    setNewSQQuantities('');
+  };
+
+  const handleSQRemove = (itemName: string) => {
+    updateSettings({ smartQuantities: settings.smartQuantities.filter(sq => sq.itemName !== itemName) });
+  };
+
+  const startEditingSQ = (sq: SmartQuantity) => {
+    setEditingSQ(sq);
+    setEditingSQName(sq.itemName);
+    setEditingSQQuantities(sq.quantities.join(', '));
+  }
+
+  const cancelEditingSQ = () => {
+    setEditingSQ(null);
+    setEditingSQName('');
+    setEditingSQQuantities('');
+  }
+
+  const handleSQUpdate = () => {
+    if (!editingSQ) return;
+
+    const quantities = editingSQQuantities.split(',').map(q => parseInt(q.trim())).filter(q => !isNaN(q) && q > 0);
+     if (quantities.length === 0) {
+        toast({ variant: 'destructive', title: 'Invalid Quantities', description: 'Please provide a comma-separated list of numbers.' });
+        return;
+    }
+
+    const updatedSQ = { itemName: editingSQName, quantities };
+    updateSettings({ 
+        smartQuantities: settings.smartQuantities.map(sq => sq.itemName === editingSQ.itemName ? updatedSQ : sq) 
+    });
+    cancelEditingSQ();
+  };
 
   return (
     <div className="p-4 space-y-6">
@@ -122,20 +192,68 @@ const SettingsView = () => {
         </CardContent>
       </Card>
 
-      {/* Smart Quantities Card - View Only for now */}
+      {/* Smart Quantities Card */}
        <Card>
         <CardHeader>
           <CardTitle>Smart Quantities</CardTitle>
-          <CardDescription>Pre-defined quantities for common items. This feature is managed automatically.</CardDescription>
+          <CardDescription>Manage pre-defined quantities for common items.</CardDescription>
         </CardHeader>
-        <CardContent>
-           <ul className="space-y-1 text-sm text-muted-foreground">
-             {settings.smartQuantities.map(sq => (
-                <li key={sq.itemName}>
-                  <strong>{sq.itemName}:</strong> {sq.quantities.join(', ')}
-                </li>
-             ))}
-           </ul>
+        <CardContent className="space-y-4">
+            <div className="space-y-2">
+                {settings.smartQuantities.map(sq => (
+                    <div key={sq.itemName}>
+                        {editingSQ?.itemName === sq.itemName ? (
+                            <div className="flex items-center justify-between p-2 bg-muted rounded-md gap-2">
+                                <div className="flex-1 space-y-1">
+                                    <Input value={editingSQName} onChange={e => setEditingSQName(e.target.value)} placeholder="Item Name"/>
+                                    <Input value={editingSQQuantities} onChange={e => setEditingSQQuantities(e.target.value)} placeholder="e.g. 1, 6, 12"/>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={handleSQUpdate}><Save className="h-4 w-4 text-green-600" /></Button>
+                                <Button variant="ghost" size="icon" onClick={cancelEditingSQ}><X className="h-4 w-4" /></Button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between p-2 bg-muted rounded-md">
+                                <div>
+                                    <span className="font-medium">{sq.itemName}</span>
+                                    <span className="text-sm text-muted-foreground ml-2">({sq.quantities.join(', ')})</span>
+                                </div>
+                                <div className="flex items-center">
+                                    <Button variant="ghost" size="icon" onClick={() => startEditingSQ(sq)}>
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This will delete the smart quantity rule for "{sq.itemName}".
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleSQRemove(sq.itemName)}>Delete</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+            <div className="border-t pt-4">
+                <h4 className="font-medium mb-2">Add New Rule</h4>
+                <div className="flex gap-2">
+                    <Input placeholder="Item Name (e.g. 'Milk')" value={newSQItemName} onChange={e => setNewSQItemName(e.target.value)} />
+                    <Input placeholder="Quantities (e.g. 1, 2, 4)" value={newSQQuantities} onChange={e => setNewSQQuantities(e.target.value)} />
+                    <Button onClick={handleSQAdd}>Add</Button>
+                </div>
+            </div>
         </CardContent>
       </Card>
     </div>
