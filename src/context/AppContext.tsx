@@ -6,10 +6,13 @@ import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
 import { autoCorrectItem } from '@/ai/flows/ai-auto-correct-item';
 import { GenerateRecipeOutput } from '@/ai/flows/ai-generate-recipe';
 import { useToast } from '@/hooks/use-toast';
+import { I18nProvider, useI18n } from '@/i18n/I18nProvider';
+import { translations } from '@/i18n/translations';
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
   textSize: 'normal',
+  language: 'en',
   username: 'Smart Shopper',
   email: 'user@example.com',
   smartQuantities: [
@@ -48,6 +51,7 @@ type AppContextType = {
   activeTab: 'lists' | 'recipes' | 'settings';
   urgentMode: boolean;
   generatedRecipe: GenerateRecipeOutput | null;
+  t: (key: keyof typeof translations.en) => string;
   navigate: (view: View) => void;
   vibrate: () => void;
   addList: (name: string, icon: string) => void;
@@ -98,7 +102,7 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, (value: T) => 
 }
 
 
-export function AppProvider({ children }: { children: ReactNode }) {
+function AppStateProvider({ children }: { children: ReactNode }) {
   const [lists, setLists] = usePersistentState<List[]>('smartlist_lists', []);
   const [recipes, setRecipes] = usePersistentState<Recipe[]>('smartlist_recipes', DUMMY_RECIPES);
   const [settings, setSettings] = usePersistentState<Settings>('smartlist_settings', DEFAULT_SETTINGS);
@@ -106,6 +110,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [urgentMode, setUrgentMode] = usePersistentState('smartlist_urgentMode', false);
   const [generatedRecipe, setGeneratedRecipe] = useState<GenerateRecipeOutput | null>(null);
   const { toast } = useToast();
+  const { t, setLanguage, language } = useI18n();
+
+  useEffect(() => {
+    if (settings.language !== language) {
+      setLanguage(settings.language);
+      document.documentElement.lang = settings.language;
+      document.documentElement.dir = settings.language === 'he' ? 'rtl' : 'ltr';
+    }
+  }, [settings.language, language, setLanguage]);
 
   const activeTab = currentView.type.includes('list') ? 'lists' : currentView.type.includes('recipe') ? 'recipes' : 'settings';
   
@@ -277,7 +290,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     setLists(lists.map(list => list.id === listId ? updatedList : list));
 
-    toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} were added to your list.` });
+    toast({ title: t('toastRecipeAddedTitle'), description: t('toastRecipeAddedDesc', { recipeName: recipe.name }) });
     navigate({ type: 'listDetail', listId });
   };
 
@@ -286,7 +299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSettings(prev => ({...prev, ...newSettings}));
   }
 
-  const value = {
+  const value: AppContextType = {
     lists,
     recipes,
     settings,
@@ -294,6 +307,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     activeTab,
     urgentMode,
     generatedRecipe,
+    t,
     navigate,
     vibrate,
     addList,
@@ -315,4 +329,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  return (
+    <I18nProvider>
+      <AppStateProvider>{children}</AppStateProvider>
+    </I18nProvider>
+  )
 }

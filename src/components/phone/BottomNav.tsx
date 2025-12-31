@@ -9,12 +9,12 @@ const BottomNav = () => {
   const context = useContext(AppContext);
   if (!context) return null;
 
-  const { activeTab, navigate } = context;
+  const { activeTab, navigate, t } = context;
 
   const navItems = [
-    { name: 'lists', icon: List, label: 'Lists', color: 'text-blue-500' },
-    { name: 'recipes', icon: UtensilsCrossed, label: 'Recipes', color: 'text-orange-500' },
-    { name: 'settings', icon: Settings, label: 'Settings', color: 'text-slate-500' },
+    { name: 'lists', icon: List, label: t('navLists'), color: 'text-primary' },
+    { name: 'recipes', icon: UtensilsCrossed, label: t('navRecipes'), color: 'text-primary' },
+    { name: 'settings', icon: Settings, label: t('navSettings'), color: 'text-primary' },
   ] as const;
 
   return (
@@ -28,7 +28,7 @@ const BottomNav = () => {
               onClick={() => navigate({ type: item.name })}
               className={cn(
                 'flex flex-col items-center justify-center p-3 w-24 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors',
-                isActive && `bg-accent ${item.color} font-semibold`
+                isActive && `bg-accent/50 ${item.color} font-semibold`
               )}
             >
               <item.icon className="w-6 h-6 mb-1" />
