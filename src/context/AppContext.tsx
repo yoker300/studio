@@ -29,12 +29,12 @@ const DUMMY_RECIPES: Recipe[] = [
       ],
     },
     {
-      id: 'recipe-2', name: 'Chicken Tacos', icon: '🌮', image: 'https://picsum.photos/seed/recipe2/600/400',
+      id: 'recipe-2', name: 'Sushi', icon: '🍣', image: 'https://picsum.photos/seed/recipe2/600/400',
       ingredients: [
-        { id: uuidv4(), name: 'Chicken Breast', qty: 2, category: 'Meat', checked: false, notes: '', store: '', urgent: false, gf: true, icon: '🍗' },
-        { id: uuidv4(), name: 'Taco Shells', qty: 1, category: 'Pantry', checked: false, notes: 'Hard corn shells', store: '', urgent: false, gf: true, icon: '🌮' },
-        { id: uuidv4(), name: 'Lettuce', qty: 1, category: 'Produce', checked: false, notes: 'head', store: '', urgent: false, gf: true, icon: '🥬' },
-        { id: uuidv4(), name: 'Shredded Cheese', qty: 1, category: 'Dairy', checked: false, notes: 'Mexican blend', store: '', urgent: false, gf: true, icon: '🧀' },
+        { id: uuidv4(), name: 'Sushi Rice', qty: 2, category: 'Pantry', checked: false, notes: 'cups', store: '', urgent: false, gf: true, icon: '🍚' },
+        { id: uuidv4(), name: 'Nori', qty: 5, category: 'Pantry', checked: false, notes: 'sheets', store: '', urgent: false, gf: true, icon: '🌿' },
+        { id: uuidv4(), name: 'Tuna', qty: 1, category: 'Seafood', checked: false, notes: 'sushi-grade', store: '', urgent: false, gf: true, icon: '🐟' },
+        { id: uuidv4(), name: 'Avocado', qty: 1, category: 'Produce', checked: false, notes: '', store: '', urgent: false, gf: true, icon: '🥑' },
       ],
     }
 ];
