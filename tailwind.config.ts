@@ -17,8 +17,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Space Grotesk', 'sans-serif'],
+        body: ['Carlito', 'sans-serif'],
+        headline: ['Carlito', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',
