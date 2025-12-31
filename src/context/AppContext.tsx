@@ -10,7 +10,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { translations } from '@/i18n/translations';
 
 const DEFAULT_SETTINGS: Settings = {
-  darkMode: false,
+  darkMode: true,
   textSize: 'normal',
   language: 'en',
   username: 'Smart Shopper',
