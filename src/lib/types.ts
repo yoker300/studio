@@ -49,4 +49,6 @@ export type View =
   | { type: 'recipeDetail'; recipeId: string }
   | { type: 'settings' }
   | { type: 'addList' }
-  | { type: 'editList'; listId: string };
+  | { type: 'editList'; listId: string }
+  | { type: 'addRecipe' }
+  | { type: 'editRecipe'; recipeId: string };

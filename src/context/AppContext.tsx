@@ -52,6 +52,7 @@ type AppContextType = {
   updateList: (id: string, name: string, icon: string) => void;
   deleteList: (id: string) => void;
   addItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => Promise<void>;
+  addSmartItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => Promise<void>;
   updateItemInList: (listId: string, item: Item) => Promise<void>;
   deleteItemInList: (listId: string, itemId: string) => void;
   toggleItemChecked: (listId: string, itemId: string) => void;
@@ -149,8 +150,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         title: "AI Correction Failed",
         description: "Could not correct item details. Using original values.",
       });
-      return { id: uuidv4(), ...item };
+      // Fallback to a non-AI generated item
+      return { id: uuidv4(), ...item, category: item.category || 'Other', icon: item.icon || '🛒' };
     }
+  };
+
+  const addSmartItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
+     vibrate();
+     const newItem: Item = { ...itemData, id: uuidv4(), checked: false };
+     setLists(prevLists => prevLists.map(list => {
+       if (list.id === listId) {
+         return { ...list, items: [...list.items, newItem] };
+       }
+       return list;
+     }));
   };
 
   const addItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
@@ -199,11 +212,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     vibrate();
     const newRecipe = { ...recipe, id: uuidv4() };
     setRecipes([...recipes, newRecipe]);
+    navigate({ type: 'recipeDetail', recipeId: newRecipe.id });
   };
   
   const updateRecipe = (updatedRecipe: Recipe) => {
     vibrate();
     setRecipes(recipes.map(recipe => recipe.id === updatedRecipe.id ? updatedRecipe : recipe));
+    navigate({ type: 'recipeDetail', recipeId: updatedRecipe.id });
   };
 
   const deleteRecipe = (recipeId: string) => {
@@ -257,6 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateList,
     deleteList,
     addItemToList,
+    addSmartItemToList,
     updateItemInList,
     deleteItemInList,
     toggleItemChecked,

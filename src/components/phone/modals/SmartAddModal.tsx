@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Mic, Sparkles } from 'lucide-react';
 import { AppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
+import { smartAddItem } from '@/ai/ai-smart-add-item';
 
 type SmartAddModalProps = {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
   const context = useContext(AppContext);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
   const { toast } = useToast();
   const recognitionRef = useRef<any>(null);
 
@@ -57,6 +59,7 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error', event.error);
+      toast({ variant: 'destructive', title: 'Voice Error', description: `Could not recognize voice: ${event.error}` });
       setIsListening(false);
     };
 
@@ -65,7 +68,7 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
     };
 
     recognitionRef.current = recognition;
-  }, []);
+  }, [toast]);
 
   const toggleListening = () => {
     if (!SpeechRecognition) {
@@ -76,25 +79,68 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
+      setTranscript('');
       recognitionRef.current?.start();
     }
     setIsListening(!isListening);
     context?.vibrate();
   };
   
-  const handleParse = () => {
-    context?.vibrate();
-    toast({
-      title: "Coming Soon!",
-      description: "AI parsing of text is not yet implemented.",
-    });
-    // In a future version, we would send `transcript` to a Gemini flow
-    // and then add the returned items to the list.
+  const handleParse = async () => {
+    if (!context || !transcript) return;
+    context.vibrate();
+    setIsParsing(true);
+
+    try {
+      const items = await smartAddItem({ voiceInput: transcript });
+      if (items && items.length > 0) {
+        for (const item of items) {
+          // The AI flow provides corrected data, so we can add it directly
+          await context.addSmartItemToList(listId, {
+            name: item.name,
+            qty: item.qty || 1,
+            category: item.category || 'Other',
+            icon: item.icon || '🛒',
+            urgent: item.urgent || false,
+            gf: false, // AI doesn't determine this yet
+            notes: '',
+            store: '',
+          });
+        }
+        toast({
+          title: "Items Added!",
+          description: `Added ${items.length} items to your list.`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No Items Found",
+          description: "The AI couldn't find any items in your text.",
+        });
+      }
+    } catch (error) {
+      console.error("AI parsing failed:", error);
+      toast({
+        variant: "destructive",
+        title: "AI Error",
+        description: "Could not parse items from your input.",
+      });
+    } finally {
+      setIsParsing(false);
+      onClose();
+    }
+  }
+
+  // Reset state when closing
+  const handleClose = () => {
+    setTranscript('');
+    setIsListening(false);
+    setIsParsing(false);
     onClose();
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -123,8 +169,10 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleParse} disabled={!transcript}>Parse Items</Button>
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleParse} disabled={!transcript || isParsing}>
+            {isParsing ? 'Parsing...' : 'Parse Items'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

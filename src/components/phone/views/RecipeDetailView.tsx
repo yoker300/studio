@@ -57,7 +57,7 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
   };
 
   const handleEdit = () => {
-     toast({ title: 'Coming Soon', description: 'Editing recipes will be available in a future update.' });
+     navigate({ type: 'editRecipe', recipeId: recipe.id });
   }
 
   const handleDelete = () => {

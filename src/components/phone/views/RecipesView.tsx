@@ -14,13 +14,10 @@ const RecipesView = () => {
 
   if (!context) return null;
 
-  const { recipes } = context;
+  const { recipes, navigate } = context;
   
   const handleCreateRecipe = () => {
-    toast({
-      title: "Coming Soon!",
-      description: "Creating new recipes is not yet implemented.",
-    });
+    navigate({ type: 'addRecipe' });
   }
 
   return (
