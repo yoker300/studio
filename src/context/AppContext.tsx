@@ -1,0 +1,272 @@
+'use client';
+
+import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { List, Recipe, Settings, Item, View } from '@/lib/types';
+import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
+import { autoCorrectItem } from '@/ai/flows/ai-auto-correct-item';
+import { useToast } from '@/hooks/use-toast';
+
+const DEFAULT_SETTINGS: Settings = {
+  darkMode: false,
+  textSize: 'normal',
+  username: 'Smart Shopper',
+  email: 'user@example.com',
+  smartQuantities: [
+    { itemName: 'Eggs', quantities: [6, 12, 18] },
+    { itemName: 'Water', quantities: [6, 12, 24] },
+  ],
+  storePresets: ['SuperMart', 'GroceryHub', 'FreshCo', 'PantryPlus'],
+};
+
+const DUMMY_RECIPES: Recipe[] = [
+    {
+      id: 'recipe-1', name: 'Spaghetti Bolognese', icon: '🍝', image: 'https://picsum.photos/seed/recipe1/600/400',
+      ingredients: [
+        { id: uuidv4(), name: 'Ground Beef', qty: 1, category: 'Meat', checked: false, notes: '80/20 lean', store: '', urgent: false, gf: true, icon: '🥩' },
+        { id: uuidv4(), name: 'Spaghetti', qty: 1, category: 'Pantry', checked: false, notes: 'box', store: '', urgent: false, gf: false, icon: '🍝' },
+        { id: uuidv4(), name: 'Tomato Sauce', qty: 1, category: 'Pantry', checked: false, notes: '24oz can', store: '', urgent: false, gf: true, icon: '🥫' },
+        { id: uuidv4(), name: 'Onion', qty: 1, category: 'Produce', checked: false, notes: '', store: '', urgent: false, gf: true, icon: '🧅' },
+      ],
+    },
+    {
+      id: 'recipe-2', name: 'Chicken Tacos', icon: '🌮', image: 'https://picsum.photos/seed/recipe2/600/400',
+      ingredients: [
+        { id: uuidv4(), name: 'Chicken Breast', qty: 2, category: 'Meat', checked: false, notes: '', store: '', urgent: false, gf: true, icon: '🍗' },
+        { id: uuidv4(), name: 'Taco Shells', qty: 1, category: 'Pantry', checked: false, notes: 'Hard corn shells', store: '', urgent: false, gf: true, icon: '🌮' },
+        { id: uuidv4(), name: 'Lettuce', qty: 1, category: 'Produce', checked: false, notes: 'head', store: '', urgent: false, gf: true, icon: '🥬' },
+        { id: uuidv4(), name: 'Shredded Cheese', qty: 1, category: 'Dairy', checked: false, notes: 'Mexican blend', store: '', urgent: false, gf: true, icon: '🧀' },
+      ],
+    }
+];
+
+type AppContextType = {
+  lists: List[];
+  recipes: Recipe[];
+  settings: Settings;
+  currentView: View;
+  activeTab: 'lists' | 'recipes' | 'settings';
+  urgentMode: boolean;
+  navigate: (view: View) => void;
+  vibrate: () => void;
+  addList: (name: string, icon: string) => void;
+  updateList: (id: string, name: string, icon: string) => void;
+  deleteList: (id: string) => void;
+  addItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => Promise<void>;
+  updateItemInList: (listId: string, item: Item) => Promise<void>;
+  deleteItemInList: (listId: string, itemId: string) => void;
+  toggleItemChecked: (listId: string, itemId: string) => void;
+  setUrgentMode: (active: boolean) => void;
+  addRecipe: (recipe: Omit<Recipe, 'id'>) => void;
+  updateRecipe: (recipe: Recipe) => void;
+  deleteRecipe: (recipeId: string) => void;
+  addRecipeToList: (recipeId: string, listId: string) => void;
+  updateSettings: (newSettings: Partial<Settings>) => void;
+};
+
+export const AppContext = createContext<AppContextType | null>(null);
+
+function usePersistentState<T>(key: string, defaultValue: T): [T, (value: T) => void] {
+  const [state, setState] = useState<T>(() => {
+    if (typeof window === 'undefined') {
+      return defaultValue;
+    }
+    try {
+      const storedValue = window.localStorage.getItem(key);
+      return storedValue ? JSON.parse(storedValue) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return defaultValue;
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(state));
+      } catch (error) {
+        console.error(`Error writing to localStorage key "${key}":`, error);
+      }
+    }
+  }, [key, state]);
+
+  return [state, setState];
+}
+
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [lists, setLists] = usePersistentState<List[]>('smartlist_lists', []);
+  const [recipes, setRecipes] = usePersistentState<Recipe[]>('smartlist_recipes', DUMMY_RECIPES);
+  const [settings, setSettings] = usePersistentState<Settings>('smartlist_settings', DEFAULT_SETTINGS);
+  const [currentView, setCurrentView] = useState<View>({ type: 'lists' });
+  const [urgentMode, setUrgentMode] = usePersistentState('smartlist_urgentMode', false);
+  const { toast } = useToast();
+
+  const activeTab = currentView.type.includes('list') ? 'lists' : currentView.type.includes('recipe') ? 'recipes' : 'settings';
+  
+  const vibrate = useCallback(() => {
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+  }, []);
+
+  const navigate = (view: View) => {
+    vibrate();
+    setCurrentView(view);
+  };
+
+  const addList = (name: string, icon: string) => {
+    vibrate();
+    const newList: List = { id: uuidv4(), name, icon, items: [] };
+    setLists([...lists, newList]);
+    navigate({type: 'listDetail', listId: newList.id});
+  };
+
+  const updateList = (id: string, name: string, icon: string) => {
+    vibrate();
+    setLists(lists.map(list => list.id === id ? { ...list, name, icon } : list));
+  }
+
+  const deleteList = (id: string) => {
+    vibrate();
+    setLists(lists.filter(list => list.id !== id));
+    navigate({ type: 'lists' });
+  }
+
+  const runAutoCorrect = async (item: Omit<Item, 'id'>): Promise<Item> => {
+    try {
+      const corrected = await autoCorrectItem({ name: item.name });
+      return {
+        id: uuidv4(),
+        ...item,
+        name: corrected.name,
+        category: corrected.category,
+        icon: corrected.icon,
+      };
+    } catch (e) {
+      console.error("AI auto-correction failed:", e);
+      toast({
+        variant: "destructive",
+        title: "AI Correction Failed",
+        description: "Could not correct item details. Using original values.",
+      });
+      return { id: uuidv4(), ...item };
+    }
+  };
+
+  const addItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
+    vibrate();
+    const newItem = await runAutoCorrect(itemData);
+    setLists(lists.map(list => {
+      if (list.id === listId) {
+        return { ...list, items: [...list.items, newItem] };
+      }
+      return list;
+    }));
+  };
+
+  const updateItemInList = async (listId: string, updatedItem: Item) => {
+    vibrate();
+    const correctedItem = await runAutoCorrect(updatedItem);
+    setLists(lists.map(list => {
+      if (list.id === listId) {
+        return { ...list, items: list.items.map(item => item.id === updatedItem.id ? { ...correctedItem, id: updatedItem.id } : item) };
+      }
+      return list;
+    }));
+  };
+
+  const deleteItemInList = (listId: string, itemId: string) => {
+    vibrate();
+    setLists(lists.map(list => {
+      if (list.id === listId) {
+        return { ...list, items: list.items.filter(item => item.id !== itemId) };
+      }
+      return list;
+    }));
+  }
+
+  const toggleItemChecked = (listId: string, itemId: string) => {
+    vibrate();
+    setLists(lists.map(list => {
+      if (list.id === listId) {
+        return { ...list, items: list.items.map(item => item.id === itemId ? { ...item, checked: !item.checked } : item) };
+      }
+      return list;
+    }));
+  }
+
+  const addRecipe = (recipe: Omit<Recipe, 'id'>) => {
+    vibrate();
+    const newRecipe = { ...recipe, id: uuidv4() };
+    setRecipes([...recipes, newRecipe]);
+  };
+  
+  const updateRecipe = (updatedRecipe: Recipe) => {
+    vibrate();
+    setRecipes(recipes.map(recipe => recipe.id === updatedRecipe.id ? updatedRecipe : recipe));
+  };
+
+  const deleteRecipe = (recipeId: string) => {
+    vibrate();
+    setRecipes(recipes.filter(r => r.id !== recipeId));
+    navigate({ type: 'recipes' });
+  };
+
+  const addRecipeToList = (recipeId: string, listId: string) => {
+    vibrate();
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return;
+
+    setLists(lists.map(list => {
+      if (list.id === listId) {
+        const newItems = [...list.items];
+        recipe.ingredients.forEach(ingredient => {
+          const existingItemIndex = newItems.findIndex(item => item.name.toLowerCase() === ingredient.name.toLowerCase() && !item.checked);
+          if (existingItemIndex > -1) {
+            newItems[existingItemIndex].qty += ingredient.qty;
+            if (ingredient.notes) {
+              newItems[existingItemIndex].notes = `${newItems[existingItemIndex].notes}, ${ingredient.notes}`.trim().replace(/^,|,$/g, '').trim();
+            }
+          } else {
+            newItems.push({ ...ingredient, id: uuidv4(), checked: false });
+          }
+        });
+        return { ...list, items: newItems };
+      }
+      return list;
+    }));
+    toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} were added to your list.` });
+    navigate({ type: 'listDetail', listId });
+  };
+
+  const updateSettings = (newSettings: Partial<Settings>) => {
+    vibrate();
+    setSettings(prev => ({...prev, ...newSettings}));
+  }
+
+  const value = {
+    lists,
+    recipes,
+    settings,
+    currentView,
+    activeTab,
+    urgentMode,
+    navigate,
+    vibrate,
+    addList,
+    updateList,
+    deleteList,
+    addItemToList,
+    updateItemInList,
+    deleteItemInList,
+    toggleItemChecked,
+    setUrgentMode,
+    addRecipe,
+    updateRecipe,
+    deleteRecipe,
+    addRecipeToList,
+    updateSettings,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}

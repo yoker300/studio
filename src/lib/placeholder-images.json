@@ -1,3 +1,28 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "recipe-1",
+      "description": "Spaghetti Bolognese",
+      "imageUrl": "https://images.unsplash.com/photo-1693609930472-cf329a4d691b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cGFzdGElMjBmb29kfGVufDB8fHx8MTc2NzE1MTQxMHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pasta food"
+    },
+    {
+      "id": "recipe-2",
+      "description": "Chicken Curry",
+      "imageUrl": "https://images.unsplash.com/photo-1633271332313-04df64c0105b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjdXJyeSUyMGZvb2R8ZW58MHx8fHwxNzY3MjE1Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "curry food"
+    },
+    {
+      "id": "recipe-3",
+      "description": "Taco Salad",
+      "imageUrl": "https://images.unsplash.com/photo-1623428186374-ef0f009bbd72?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8c2FsYWQlMjBmb29kfGVufDB8fHx8MTc2NzEyNTY1N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "salad food"
+    },
+    {
+      "id": "recipe-4",
+      "description": "Pancakes",
+      "imageUrl": "https://images.unsplash.com/photo-1627876680112-4071fd0e50f6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwYW5jYWtlcyUyMGJyZWFrZmFzdHxlbnwwfHx8fDE3NjcxNjQ0ODN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pancakes breakfast"
+    }
+  ]
 }
