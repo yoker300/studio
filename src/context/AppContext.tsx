@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
 import { autoCorrectItem } from '@/ai/flows/ai-auto-correct-item';
 import { GenerateRecipeOutput } from '@/ai/flows/ai-generate-recipe';
 import { useToast } from '@/hooks/use-toast';
-import { I18nProvider, useI18n } from '@/i18n/I18nProvider';
+import { useI18n } from '@/i18n/I18nProvider';
 import { translations } from '@/i18n/translations';
 
 const DEFAULT_SETTINGS: Settings = {
@@ -102,7 +102,7 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, (value: T) => 
 }
 
 
-function AppStateProvider({ children }: { children: ReactNode }) {
+export function AppProvider({ children }: { children: ReactNode }) {
   const [lists, setLists] = usePersistentState<List[]>('smartlist_lists', []);
   const [recipes, setRecipes] = usePersistentState<Recipe[]>('smartlist_recipes', DUMMY_RECIPES);
   const [settings, setSettings] = usePersistentState<Settings>('smartlist_settings', DEFAULT_SETTINGS);
@@ -329,12 +329,4 @@ function AppStateProvider({ children }: { children: ReactNode }) {
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
-}
-
-export function AppProvider({ children }: { children: ReactNode }) {
-  return (
-    <I18nProvider>
-      <AppStateProvider>{children}</AppStateProvider>
-    </I18nProvider>
-  )
 }
