@@ -9,12 +9,12 @@ const BottomNav = () => {
   const context = useContext(AppContext);
   if (!context) return null;
 
-  const { activeTab, navigate, t } = context;
+  const { activeTab, navigate } = context;
 
   const navItems = [
-    { name: 'lists', icon: List, label: t('navLists'), color: 'text-primary' },
-    { name: 'recipes', icon: UtensilsCrossed, label: t('navRecipes'), color: 'text-primary' },
-    { name: 'settings', icon: Settings, label: t('navSettings'), color: 'text-primary' },
+    { name: 'lists', icon: List, label: 'Lists', color: 'text-primary' },
+    { name: 'recipes', icon: UtensilsCrossed, label: 'Recipes', color: 'text-primary' },
+    { name: 'settings', icon: Settings, label: 'Settings', color: 'text-primary' },
   ] as const;
 
   return (
