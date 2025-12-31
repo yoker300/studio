@@ -32,10 +32,10 @@ type RecipeDetailViewProps = {
 
 const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
   const context = useContext(AppContext);
-  const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const recipe = context?.recipes.find(r => r.id === recipeId);
+  const [selectedListId, setSelectedListId] = useState<string | null>(context?.lists[0]?.id || null);
 
   if (!context || !recipe) return (
     <div className="p-4">
@@ -114,7 +114,7 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
         <div>
           <h2 className="text-2xl font-headline font-semibold mb-2">Add to Shopping List</h2>
           <div className="flex gap-2">
-            <Select onValueChange={setSelectedListId} defaultValue={lists[0]?.id}>
+            <Select onValueChange={setSelectedListId} defaultValue={selectedListId || undefined}>
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Select a list" />
               </SelectTrigger>
