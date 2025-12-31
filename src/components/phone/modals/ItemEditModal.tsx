@@ -132,7 +132,11 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md p-4">
         <form onSubmit={handleSubmit(onSubmit)}>
-          <DialogHeader className="flex-row items-center gap-2 mb-4">
+          <DialogHeader>
+            <DialogTitle>{item ? 'Edit Item' : 'Add Item'}</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center gap-2 my-4">
             <Controller
               name="icon"
               control={control}
@@ -147,7 +151,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 <Input {...field} placeholder="Item Name" className="text-2xl font-headline font-bold h-16 flex-1" />
               )}
             />
-          </DialogHeader>
+          </div>
 
           <div className="space-y-4">
             {/* Quantity */}
