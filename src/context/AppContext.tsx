@@ -154,13 +154,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { id: uuidv4(), ...item, category: item.category || 'Other', icon: item.icon || '🛒' };
     }
   };
+  
+  const addOrMergeItem = (list: List, itemToAdd: Item): List => {
+    const existingItemIndex = list.items.findIndex(
+      (item) => item.name.toLowerCase() === itemToAdd.name.toLowerCase() && !item.checked
+    );
+
+    if (existingItemIndex > -1) {
+      // Merge with existing item
+      const newItems = [...list.items];
+      const existingItem = newItems[existingItemIndex];
+      
+      const combinedNotes = [existingItem.notes, itemToAdd.notes].filter(Boolean).join(', ');
+
+      newItems[existingItemIndex] = {
+        ...existingItem,
+        qty: existingItem.qty + itemToAdd.qty,
+        urgent: existingItem.urgent || itemToAdd.urgent,
+        notes: combinedNotes,
+        // Keep other properties from the existing item, but you could decide to update them
+      };
+      return { ...list, items: newItems };
+    } else {
+      // Add as new item
+      return { ...list, items: [...list.items, itemToAdd] };
+    }
+  };
+
 
   const addSmartItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
      vibrate();
      const newItem: Item = { ...itemData, id: uuidv4(), checked: false };
      setLists(prevLists => prevLists.map(list => {
        if (list.id === listId) {
-         return { ...list, items: [...list.items, newItem] };
+         return addOrMergeItem(list, newItem);
        }
        return list;
      }));
@@ -171,7 +198,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newItem = await runAutoCorrect(itemData);
     setLists(lists.map(list => {
       if (list.id === listId) {
-        return { ...list, items: [...list.items, newItem] };
+        return addOrMergeItem(list, { ...newItem, checked: false });
       }
       return list;
     }));
@@ -230,26 +257,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addRecipeToList = (recipeId: string, listId: string) => {
     vibrate();
     const recipe = recipes.find(r => r.id === recipeId);
-    if (!recipe) return;
+    const targetList = lists.find(l => l.id === listId);
+    if (!recipe || !targetList) return;
 
-    setLists(lists.map(list => {
-      if (list.id === listId) {
-        const newItems = [...list.items];
-        recipe.ingredients.forEach(ingredient => {
-          const existingItemIndex = newItems.findIndex(item => item.name.toLowerCase() === ingredient.name.toLowerCase() && !item.checked);
-          if (existingItemIndex > -1) {
-            newItems[existingItemIndex].qty += ingredient.qty;
-            if (ingredient.notes) {
-              newItems[existingItemIndex].notes = `${newItems[existingItemIndex].notes}, ${ingredient.notes}`.trim().replace(/^,|,$/g, '').trim();
-            }
-          } else {
-            newItems.push({ ...ingredient, id: uuidv4(), checked: false });
-          }
-        });
-        return { ...list, items: newItems };
-      }
-      return list;
-    }));
+    let updatedList = { ...targetList };
+    recipe.ingredients.forEach(ingredient => {
+      const itemToAdd: Item = { ...ingredient, id: uuidv4(), checked: false };
+      updatedList = addOrMergeItem(updatedList, itemToAdd);
+    });
+
+    setLists(lists.map(list => list.id === listId ? updatedList : list));
+
     toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} were added to your list.` });
     navigate({ type: 'listDetail', listId });
   };
