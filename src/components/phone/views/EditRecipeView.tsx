@@ -16,7 +16,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 const ingredientSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Ingredient name is required.'),
-  qty: z.number().min(1),
+  qty: z.number().positive("Quantity must be a positive number."),
   icon: z.string(),
   notes: z.string().optional(),
 });
@@ -82,7 +82,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
             name: generatedRecipe.name,
             icon: generatedRecipe.icon,
             image: PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]?.imageUrl || 'https://picsum.photos/seed/newrecipe/600/400',
-            ingredients: generatedRecipe.ingredients.map(ing => ({ ...ing, id: uuidv4() })),
+            ingredients: generatedRecipe.ingredients.map(ing => ({ ...ing, id: uuidv4(), qty: ing.qty || 1, icon: ing.icon || '🛒' })),
         })
     }
   }, [isEditing, recipe, generatedRecipe, reset]);
@@ -177,7 +177,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
                      <Controller
                         control={control}
                         name={`ingredients.${index}.qty` as const}
-                        render={({ field }) => <Input {...field} type="number" className="w-16" min={1} onChange={e => field.onChange(parseInt(e.target.value) || 1)}/>}
+                        render={({ field }) => <Input {...field} type="number" step="0.01" className="w-16" min={0} onChange={e => field.onChange(parseFloat(e.target.value) || 0)}/>}
                       />
                     <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
                       <Trash2 className="h-4 w-4" />
