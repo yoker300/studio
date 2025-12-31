@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 210 100% 97.1%; /* #F0F8FF */
-    --foreground: 240 10% 3.9%;
-    --card: 210 100% 100%;
+    --background: 0 0% 100%; /* White */
+    --foreground: 240 10% 3.9%; /* Dark Blue */
+    --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
-    --popover: 210 100% 100%;
+    --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 200 68% 89.6%; /* #A0D2EB */
-    --primary-foreground: 210 40% 9.8%;
+    --primary: 220 90% 60%; /* Brighter Blue */
+    --primary-foreground: 0 0% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 210 40% 9.8%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 240 5.9% 65.9%;
-    --accent: 60 80% 90.2%; /* #FAFAD2 */
-    --accent-foreground: 60 40% 9.8%;
+    --accent: 210 40% 96.1%; /* Using secondary color instead of yellow */
+    --accent-foreground: 210 40% 9.8%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 210 40% 89.8%;
     --input: 210 40% 89.8%;
-    --ring: 200 68% 89.6%;
+    --ring: 220 90% 60%;
     --radius: 0.5rem;
   }
 
@@ -33,19 +33,19 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 200 50% 40%;
-    --primary-foreground: 200 68% 90%;
+    --primary: 210 90% 60%;
+    --primary-foreground: 240 10% 3.9%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 60 50% 40%;
-    --accent-foreground: 60 80% 90%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 200 50% 40%;
+    --ring: 210 90% 60%;
   }
 
   .urgent-mode {
