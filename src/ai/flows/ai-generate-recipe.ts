@@ -26,7 +26,7 @@ const GenerateRecipeOutputSchema = z.object({
         z.object({
             name: z.string().describe('The name of the ingredient.'),
             qty: z.number().optional().describe('The quantity of the ingredient.'),
-            notes: z.string().optional().describe("A short note about the ingredient, including units like 'cups', 'tbsp', 'diced', or 'to taste'."),
+            notes: z.string().optional().describe("A short note about the ingredient, containing only the unit of measurement like 'cups', 'tbsp', or preparation notes like 'diced' or 'to taste'. Do NOT include the quantity number in this field."),
             icon: z.string().optional().describe('An emoji icon for the ingredient.'),
         })
     ),
@@ -41,7 +41,7 @@ const generateRecipePrompt = ai.definePrompt({
   name: 'generateRecipePrompt',
   input: {schema: GenerateRecipeInputSchema},
   output: {schema: GenerateRecipeOutputSchema},
-  prompt: `You are a shopping list assistant and expert chef. The user will provide a recipe name, and you will parse it to extract a JSON object containing the recipe name, a suitable emoji icon, and an array of common ingredients for that recipe. Use conservative quantities for a standard version of the recipe. For each ingredient, include the unit of measurement (e.g., "1 cup", "2 tbsp", "1/2 tsp") in the 'notes' field.
+  prompt: `You are a shopping list assistant and expert chef. The user will provide a recipe name, and you will parse it to extract a JSON object containing the recipe name, a suitable emoji icon, and an array of common ingredients for that recipe. Use conservative quantities for a standard version of the recipe. For each ingredient, provide the numeric quantity in the 'qty' field and the unit of measurement (e.g., "cups", "tbsp") or a preparation note (e.g., "diced") in the 'notes' field. The 'notes' field should NOT contain numbers.
   
 Recipe Name: {{{recipeName}}}`,
 });
