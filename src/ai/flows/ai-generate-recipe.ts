@@ -3,12 +3,10 @@
 /**
  * @fileOverview This file defines a Genkit flow for generating a complete recipe from a name.
  *
- * @exportedFunctions:
- *   - `generateRecipe`:  A function that takes a recipe name and returns a structured recipe object.
- *
- * @exportedTypes:
- *   - `GenerateRecipeInput`: The input type for the `generateRecipe` function.
- *   - `GenerateRecipeOutput`: The output type for the `generateRecipe` function.
+ * This file exports a single function, `generateRecipe`, which is a server action
+ * that takes a recipe name and returns a structured recipe object.
+ * The input and output types (`GenerateRecipeInput`, `GenerateRecipeOutput`) are defined
+ * in `src/lib/types.ts`.
  */
 
 import {ai} from '@/ai/genkit';

@@ -3,9 +3,10 @@
 /**
  * @fileOverview An AI agent for parsing voice input to add multiple items to a shopping list.
  *
- * - smartAddItem - A function that handles parsing voice input to extract item details.
- * - SmartAddItemInput - The input type for the smartAddItem function.
- * - SmartAddItemOutput - The return type for the smartAddItem function.
+ * This file exports a single function, `smartAddItem`, which is a server action
+ * that takes a voice input string and returns a structured list of shopping items.
+ * The input and output types (`SmartAddItemInput`, `SmartAddItemOutput`) are defined
+ * in `src/lib/types.ts`.
  */
 
 import {ai} from '@/ai/genkit';

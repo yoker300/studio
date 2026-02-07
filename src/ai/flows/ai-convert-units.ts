@@ -1,20 +1,15 @@
 'use server';
 
 /**
- * @fileOverview Defines a Genkit flow for converting ingredient quantities to a standard base unit.
+ * @fileOverview Defines a Genkit flow for converting ingredient quantities.
  *
- * @exportedFunctions:
- *   - `convertUnits`: A function that takes an ingredient's details and returns its quantity in a base unit (grams or milliliters).
- *
- * @exportedTypes:
- *   - `ConvertUnitsInput`: The input type for the `convertUnits` function.
- *   - `ConvertUnitsOutput`: The output type for the `convertUnits` function.
+ * This file exports a single function, `convertUnits`, a server action that takes
+ * an ingredient's details and returns its quantity in a base unit.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { ConvertUnitsInput, ConvertUnitsOutput } from '@/lib/types';
-
 
 const ConvertUnitsInputSchema = z.object({
   name: z.string().describe('The name of the ingredient.'),
@@ -22,23 +17,21 @@ const ConvertUnitsInputSchema = z.object({
   unit: z.string().optional().describe('The current unit of the ingredient (e.g., "cup", "tbsp", "oz").'),
 });
 
-
 const ConvertUnitsOutputSchema = z.object({
   qty: z.number().optional().describe('The converted quantity in the base unit.'),
   unit: z.string().optional().describe('The base unit, either "g" for solids or "ml" for liquids.'),
   error: z.string().optional().describe('An error message if the conversion could not be performed.'),
 });
 
-
 export async function convertUnits(input: ConvertUnitsInput): Promise<ConvertUnitsOutput> {
-    return convertUnitsFlow(input);
+  return convertUnitsFlow(input);
 }
 
 const convertUnitsPrompt = ai.definePrompt({
-    name: 'convertUnitsPrompt',
-    input: { schema: ConvertUnitsInputSchema },
-    output: { schema: ConvertUnitsOutputSchema },
-    prompt: `You are an expert kitchen scientist specializing in food density and measurements. Your task is to convert a given ingredient quantity into a standard base unit.
+  name: 'convertUnitsPrompt',
+  input: { schema: ConvertUnitsInputSchema },
+  output: { schema: ConvertUnitsOutputSchema },
+  prompt: `You are an expert kitchen scientist specializing in food density and measurements. Your task is to convert a given ingredient quantity into a standard base unit.
 - If the ingredient is a SOLID (like flour, sugar, butter, chopped vegetables), convert its quantity to GRAMS (g).
 - If the ingredient is a LIQUID (like water, milk, oil), convert its quantity to MILLILITERS (ml).
 
@@ -53,19 +46,14 @@ Unit: {{{unit}}}
 `,
 });
 
-
 const convertUnitsFlow = ai.defineFlow(
   {
     name: 'convertUnitsFlow',
     inputSchema: ConvertUnitsInputSchema,
     outputSchema: ConvertUnitsOutputSchema,
   },
-  async (input) => {
-    // If no unit is provided, it cannot be converted.
-    if (!input.unit) {
-        return { error: "No unit provided." };
-    }
-    const { output } = await convertUnitsPrompt(input);
+  async input => {
+    const {output} = await convertUnitsPrompt(input);
     return output!;
   }
 );

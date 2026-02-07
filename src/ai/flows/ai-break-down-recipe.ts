@@ -3,12 +3,10 @@
 /**
  * @fileOverview This file defines a Genkit flow for breaking down a recipe name into a list of ingredients.
  *
- * @exportedFunctions:
- *   - `breakDownRecipe`:  A function that takes a recipe name and returns a list of ingredients.
- *
- * @exportedTypes:
- *   - `BreakDownRecipeInput`: The input type for the `breakDownRecipe` function.
- *   - `BreakDownRecipeOutput`: The output type for the `breakDownRecipe` function.
+ * This file exports a single function, `breakDownRecipe`, which is a server action
+ * that takes a recipe name and returns a structured list of ingredients.
+ * The input and output types (`BreakDownRecipeInput`, `BreakDownRecipeOutput`) are defined
+ * in `src/lib/types.ts`.
  */
 
 import {ai} from '@/ai/genkit';

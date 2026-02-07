@@ -5,12 +5,10 @@
  * It translates the item name to a canonical English name, corrects spelling,
  * assigns it to a fixed category, and selects an appropriate emoji icon.
  *
- * @exportedFunctions:
- *   - `processItem`:  The main function that processes an item name.
- *
- * @exportedTypes:
- *   - `ProcessItemInput`: The input type for the `processItem` function.
- *   - `ProcessItemOutput`: The output type for the `processItem` function.
+ * This file exports a single function, `processItem`, which is a server action
+ * that takes an item name and returns its processed details.
+ * The input and output types (`ProcessItemInput`, `ProcessItemOutput`) are defined
+ * in `src/lib/types.ts`.
  */
 
 import {ai} from '@/ai/genkit';
