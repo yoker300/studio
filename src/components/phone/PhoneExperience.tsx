@@ -12,6 +12,7 @@ import AddListView from './views/AddListView';
 import EditListView from './views/EditListView';
 import EditRecipeView from './views/EditRecipeView';
 import GenerateRecipeView from './views/GenerateRecipeView';
+import { MergeConfirmationModal } from './modals/MergeConfirmationModal';
 
 const PhoneExperience = () => {
   const context = useContext(AppContext);
@@ -50,6 +51,7 @@ const PhoneExperience = () => {
       <main className="flex-1 overflow-y-auto pb-20">
         {renderView()}
       </main>
+      <MergeConfirmationModal />
       <BottomNav />
     </div>
   );

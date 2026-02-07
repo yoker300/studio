@@ -178,7 +178,7 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
     setView('confirm');
   }
 
-  const handleConfirmAdd = async () => {
+  const handleConfirmAdd = () => {
     if (!context) return;
     context.vibrate();
     
@@ -189,29 +189,24 @@ export function SmartAddModal({ isOpen, onClose, listId }: SmartAddModalProps) {
         return;
     }
 
-    try {
-        for (const item of itemsToAdd) {
-            await context.addSmartItemToList(listId, {
-                name: item.name,
-                qty: item.qty || 1,
-                category: item.category || 'Other',
-                icon: item.icon || '🛒',
-                urgent: item.urgent || false,
-                gf: false,
-                notes: '',
-                store: '',
-            });
-        }
-        toast({
-            title: "Items Added!",
-            description: `Added ${itemsToAdd.length} items to your list.`,
+    for (const item of itemsToAdd) {
+        context.addSmartItemToList(listId, {
+            name: item.name,
+            qty: item.qty || 1,
+            category: item.category || 'Other',
+            icon: item.icon || '🛒',
+            urgent: item.urgent || false,
+            gf: false,
+            notes: '',
+            store: '',
         });
-    } catch(e) {
-        console.error("Error adding items:", e);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not add items to the list.' });
-    } finally {
-        handleClose();
     }
+    toast({
+        title: "Items Queued",
+        description: `Processing ${itemsToAdd.length} items for your list.`,
+    });
+    
+    handleClose();
   };
 
   // Reset state when closing

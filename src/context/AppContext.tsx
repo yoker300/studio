@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { List, Recipe, Settings, Item, View, GenerateRecipeOutput } from '@/lib/types';
+import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
 import { processItem } from '@/ai/flows/ai-process-item';
 import { useToast } from '@/hooks/use-toast';
@@ -47,14 +47,15 @@ type AppContextType = {
   activeTab: 'lists' | 'recipes' | 'settings';
   urgentMode: boolean;
   generatedRecipe: GenerateRecipeOutput | null;
+  mergeProposal: MergeProposal | null;
   navigate: (view: View) => void;
   vibrate: () => void;
   addList: (name: string, icon: string) => void;
   updateList: (id: string, name: string, icon: string) => void;
   deleteList: (id: string) => void;
-  addItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => Promise<void>;
-  addSmartItemToList: (listId: string, item: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => Promise<void>;
-  updateItemInList: (listId: string, item: Item) => Promise<void>;
+  addItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => void;
+  addSmartItemToList: (listId: string, item: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => void;
+  updateItemInList: (listId: string, item: Item) => void;
   deleteItemInList: (listId: string, itemId: string) => void;
   toggleItemChecked: (listId: string, itemId: string) => void;
   setUrgentMode: (active: boolean) => void;
@@ -65,6 +66,8 @@ type AppContextType = {
   updateSettings: (newSettings: Partial<Settings>) => void;
   setGeneratedRecipe: (recipe: GenerateRecipeOutput | null) => void;
   clearGeneratedRecipe: () => void;
+  confirmMerge: () => void;
+  declineMerge: (keepSeparate?: boolean) => void;
 };
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -105,6 +108,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [urgentMode, setUrgentMode] = usePersistentState('smartlist_urgentMode', false);
   const [generatedRecipe, setGeneratedRecipe] = useState<GenerateRecipeOutput | null>(null);
   const { toast } = useToast();
+  
+  const [mergeProposal, setMergeProposal] = useState<MergeProposal | null>(null);
+  const [pendingItemsQueue, setPendingItemsQueue] = useState<(Omit<Item, 'id' | 'checked'> & { listId: string; skipProcessing?: boolean })[]>([]);
 
   const activeTab = currentView.type.includes('list') ? 'lists' : currentView.type.includes('recipe') ? 'recipes' : 'settings';
   
@@ -141,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate({ type: 'lists' });
   }
 
-  const runItemProcessing = async (item: Omit<Item, 'id' | 'checked'>): Promise<Item> => {
+  const runItemProcessing = async (item: Omit<Item, 'id' | 'checked'>): Promise<Omit<Item, 'id' | 'checked'>> => {
     try {
       const processed = await processItem({
         name: item.name,
@@ -149,7 +155,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         unit: item.unit,
        });
       return {
-        id: uuidv4(),
         ...item,
         name: processed.name,
         canonicalName: processed.canonicalName,
@@ -157,7 +162,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         icon: processed.icon,
         qty: processed.qty,
         unit: processed.unit,
-        checked: false,
       };
     } catch (e) {
       console.error("AI item processing failed:", e);
@@ -167,87 +171,177 @@ export function AppProvider({ children }: { children: ReactNode }) {
         description: "Could not process item details. Using original values.",
       });
       return { 
-        id: uuidv4(), 
         ...item, 
         canonicalName: item.name, 
         category: item.category || 'Other', 
         icon: item.icon || '🛒',
-        checked: false,
       };
     }
   };
 
-  const _addItemToList = async (listId: string, itemData: Omit<Item, 'id'>, skipProcessing = false) => {
-    vibrate();
-  
-    const newItem = skipProcessing 
-      ? { ...itemData, id: uuidv4() } 
-      : await runItemProcessing(itemData);
-  
+  const _commitItemToList = (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
+    const newItem: Item = {
+      ...itemData,
+      id: uuidv4(),
+      checked: false,
+      notes: (itemData.notes || '').trim(),
+      store: (itemData.store || '').trim(),
+    };
+    
     setLists(prevLists => {
-      const listIndex = prevLists.findIndex(l => l.id === listId);
-      if (listIndex === -1) return prevLists;
-  
-      const currentList = prevLists[listIndex];
-      let newItems = [...currentList.items];
-  
-      // Sync category with any existing items of the same kind
-      const representativeItem = newItems.find(i => i.canonicalName === newItem.canonicalName);
-      newItem.category = representativeItem?.category || newItem.category;
-  
-      // Attempt to merge the item
-      const mergeCandidateIndex = newItems.findIndex(i => 
-        !i.checked &&
-        i.canonicalName === newItem.canonicalName &&
-        i.unit === newItem.unit && // Units must now match after standardization
-        i.notes === newItem.notes
-      );
-  
-      if (mergeCandidateIndex > -1) {
-        const candidate = newItems[mergeCandidateIndex];
-        candidate.qty += newItem.qty;
-        candidate.urgent = candidate.urgent || newItem.urgent;
-      } else {
-        newItems.push(newItem);
+        const listIndex = prevLists.findIndex(l => l.id === listId);
+        if (listIndex === -1) return prevLists;
+
+        const currentList = prevLists[listIndex];
+        const updatedList = { ...currentList, items: [...currentList.items, newItem] };
+        const newLists = [...prevLists];
+        newLists[listIndex] = updatedList;
+        return newLists;
+    });
+  };
+
+  const _performMerge = (listId: string, existingItem: Item, newItemData: Omit<Item, 'id' | 'checked'>) => {
+      setLists(prevLists => {
+          const listIndex = prevLists.findIndex(l => l.id === listId);
+          if (listIndex === -1) return prevLists;
+          
+          const currentList = prevLists[listIndex];
+          const updatedItems = currentList.items.map(i => {
+              if (i.id === existingItem.id) {
+                  return {
+                      ...i,
+                      qty: i.qty + newItemData.qty,
+                      urgent: i.urgent || newItemData.urgent,
+                      store: (i.store || newItemData.store || '').trim(),
+                  };
+              }
+              return i;
+          });
+
+          const updatedList = { ...currentList, items: updatedItems };
+          const newLists = [...prevLists];
+          newLists[listIndex] = updatedList;
+          return newLists;
+      });
+  };
+
+  const processItemsQueue = useCallback(() => {
+    if (mergeProposal || pendingItemsQueue.length === 0) {
+      return;
+    }
+
+    const [currentItem, ...restOfQueue] = pendingItemsQueue;
+    setPendingItemsQueue(restOfQueue);
+    
+    const { listId, ...itemData } = currentItem;
+
+    const processAndAddItem = async () => {
+        const newItem = currentItem.skipProcessing
+            ? itemData
+            : await runItemProcessing(itemData);
+
+        const list = lists.find(l => l.id === listId);
+        if (!list) return;
+
+        const newItemNotes = (newItem.notes || '').trim();
+        const newItemStore = (newItem.store || '').trim();
+
+        // 1. Perfect Match Check
+        const perfectMatch = list.items.find(i => 
+            !i.checked &&
+            i.canonicalName === newItem.canonicalName &&
+            i.unit === newItem.unit &&
+            (i.notes || '').trim() === newItemNotes &&
+            (i.store || '').trim() === newItemStore
+        );
+
+        if (perfectMatch) {
+            _performMerge(listId, perfectMatch, newItem);
+            return;
+        }
+
+        // 2. Store Merge Proposal Check
+        const storeProposalMatch = list.items.find(i =>
+            !i.checked &&
+            i.canonicalName === newItem.canonicalName &&
+            i.unit === newItem.unit &&
+            (i.notes || '').trim() === newItemNotes &&
+            ((!!(i.store || '').trim() && !newItemStore) || (!((i.store || '').trim()) && !!newItemStore))
+        );
+
+        if (storeProposalMatch) {
+            setMergeProposal({
+                existingItem: storeProposalMatch,
+                newItemData: newItem,
+                listId: listId,
+            });
+            // Stop processing until user responds
+            return;
+        }
+
+        // 3. No merge. Just add it.
+        _commitItemToList(listId, newItem);
+    };
+
+    processAndAddItem().finally(() => {
+        // After item is processed (and if no modal was shown), check queue again
+        if (!mergeProposal) {
+             setPendingItemsQueue(prev => {
+                if (prev.length > 0) {
+                    // Use timeout to avoid deep recursion issues
+                    setTimeout(() => processItemsQueue(), 0);
+                }
+                return prev;
+             });
+        }
+    });
+
+  }, [pendingItemsQueue, mergeProposal, lists, runItemProcessing, toast]);
+
+  useEffect(() => {
+    if (pendingItemsQueue.length > 0 && !mergeProposal) {
+        processItemsQueue();
+    }
+  }, [pendingItemsQueue, mergeProposal, processItemsQueue]);
+
+
+  const confirmMerge = () => {
+    if (!mergeProposal) return;
+    const { listId, existingItem, newItemData } = mergeProposal;
+    _performMerge(listId, existingItem, newItemData);
+    setMergeProposal(null);
+  };
+
+  const declineMerge = (keepSeparate = true) => {
+      if (!mergeProposal) return;
+      const { listId, newItemData } = mergeProposal;
+      if (keepSeparate) {
+          _commitItemToList(listId, newItemData);
       }
-      
-      const finalCategory = (newItems.find(i => i.canonicalName === newItem.canonicalName) || newItem).category;
-      const syncedItems = newItems.map(i => 
-        i.canonicalName === newItem.canonicalName ? { ...i, category: finalCategory } : i
-      );
-  
-      const updatedList = { ...currentList, items: syncedItems };
-      const newLists = [...prevLists];
-      newLists[listIndex] = updatedList;
-      return newLists;
-    });
+      setMergeProposal(null);
   };
 
-  const addSmartItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => {
-    await _addItemToList(listId, { ...itemData, checked: false }, true);
+  const addSmartItemToList = (listId: string, itemData: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => {
+      setPendingItemsQueue(prev => [...prev, { ...itemData, listId, skipProcessing: true }]);
   };
   
-  const addItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
-    await _addItemToList(listId, { ...itemData, checked: false }, false);
+  const addItemToList = (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
+      setPendingItemsQueue(prev => [...prev, { ...itemData, listId, skipProcessing: false }]);
   };
 
-  const updateItemInList = async (listId: string, updatedItem: Item) => {
+  const updateItemInList = (listId: string, updatedItem: Item) => {
     vibrate();
-  
-    setLists(prevLists => {
-      const listIndex = prevLists.findIndex(l => l.id === listId);
-      if (listIndex === -1) return prevLists;
-  
-      const currentList = prevLists[listIndex];
-      // Temporarily remove the item to be updated
-      const itemsWithoutOriginal = currentList.items.filter(i => i.id !== updatedItem.id);
-      
-      const newLists = [...prevLists];
-      newLists[listIndex] = { ...currentList, items: itemsWithoutOriginal };
-      return newLists;
-    });
+    
+    // Remove the original item from the list state
+    setLists(prevLists => prevLists.map(list => 
+        list.id === listId 
+            ? { ...list, items: list.items.filter(i => i.id !== updatedItem.id) } 
+            : list
+    ));
 
-    await addItemToList(listId, { ...updatedItem });
+    // Add the updated item to the queue to be re-processed for merges
+    const { id, checked, ...itemData } = updatedItem;
+    setPendingItemsQueue(prev => [...prev, { ...itemData, listId, skipProcessing: false }]);
   };
   
   const deleteItemInList = (listId: string, itemId: string) => {
@@ -293,16 +387,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     vibrate();
     const recipe = recipes.find(r => r.id === recipeId);
     if (!recipe) return;
-
-    recipe.ingredients.forEach(ingredient => {
-      _addItemToList(listId, { 
+    
+    const itemsToQueue = recipe.ingredients.map(ingredient => ({
         ...ingredient,
-        checked: false,
-        canonicalName: ingredient.canonicalName || ingredient.name
-      }, true);
-    });
+        listId,
+        skipProcessing: true,
+    }));
+    setPendingItemsQueue(prev => [...prev, ...itemsToQueue]);
 
-    toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} were added to your list.` });
+    toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} will be added to your list.` });
     navigate({ type: 'listDetail', listId });
   };
 
@@ -319,6 +412,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     activeTab,
     urgentMode,
     generatedRecipe,
+    mergeProposal,
     navigate,
     vibrate,
     addList,
@@ -337,6 +431,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateSettings,
     setGeneratedRecipe,
     clearGeneratedRecipe,
+    confirmMerge,
+    declineMerge,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

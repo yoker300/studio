@@ -122,3 +122,9 @@ export type ConvertUnitsOutput = {
   unit?: string;
   error?: string;
 };
+
+export type MergeProposal = {
+  existingItem: Item;
+  newItemData: Omit<Item, 'id' | 'checked'>;
+  listId: string;
+};

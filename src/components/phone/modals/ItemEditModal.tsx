@@ -69,6 +69,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
 
   useEffect(() => {
     if (isOpen) {
+      setIsSubmitting(false);
       if (item) {
         reset({
           icon: item.icon || '🛒',
@@ -109,7 +110,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     (rule) => watchedName.toLowerCase().includes(rule.itemName.toLowerCase())
   );
 
-  const onSubmit = async (data: ItemFormData) => {
+  const onSubmit = (data: ItemFormData) => {
     setIsSubmitting(true);
     const itemData = {
       ...data,
@@ -119,21 +120,14 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       store: data.store || '',
     };
     
-    try {
-      if (item) { 
-        await updateItemInList(listId, { ...item, ...itemData });
-        toast({ title: "Item Updated", description: `${data.name} has been updated.`});
-      } else {
-        await addItemToList(listId, { ...itemData, checked: false });
-        toast({ title: "Item Added", description: `${data.name} has been added to your list.`});
-      }
-      onClose();
-    } catch(e) {
-      console.error(e)
-      toast({ variant: "destructive", title: "Error", description: "Could not save the item."});
-    } finally {
-      setIsSubmitting(false);
+    if (item) { 
+      updateItemInList(listId, { ...item, ...itemData });
+      toast({ title: "Item Update Queued", description: `"${data.name}" will be processed.`});
+    } else {
+      addItemToList(listId, { ...itemData, checked: false });
+      toast({ title: "Item Added to Queue", description: `"${data.name}" will be processed.`});
     }
+    onClose();
   };
 
   return (
