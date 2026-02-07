@@ -237,7 +237,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const processAndAddItem = async () => {
         const newItem = currentItem.skipProcessing
-            ? itemData
+            ? { ...itemData, canonicalName: itemData.name }
             : await runItemProcessing(itemData);
 
         const list = lists.find(l => l.id === listId);
@@ -296,7 +296,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
     });
 
-  }, [pendingItemsQueue, mergeProposal, lists, runItemProcessing, toast]);
+  }, [pendingItemsQueue, mergeProposal, lists, toast]);
 
   useEffect(() => {
     if (pendingItemsQueue.length > 0 && !mergeProposal) {
@@ -391,7 +391,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const itemsToQueue = recipe.ingredients.map(ingredient => ({
         ...ingredient,
         listId,
-        skipProcessing: true,
+        skipProcessing: false, // Ensure all recipe items are processed
     }));
     setPendingItemsQueue(prev => [...prev, ...itemsToQueue]);
 
