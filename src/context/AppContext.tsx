@@ -3,7 +3,7 @@
 import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { List, Recipe, Settings, Item, View } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
-import { autoCorrectItem } from '@/ai/flows/ai-auto-correct-item';
+import { processItem } from '@/ai/flows/ai-process-item';
 import { GenerateRecipeOutput } from '@/ai/flows/ai-generate-recipe';
 import { useToast } from '@/hooks/use-toast';
 
@@ -54,7 +54,7 @@ type AppContextType = {
   updateList: (id: string, name: string, icon: string) => void;
   deleteList: (id: string) => void;
   addItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => Promise<void>;
-  addSmartItemToList: (listId: string, item: Omit<Item, 'id' | 'checked'>) => Promise<void>;
+  addSmartItemToList: (listId: string, item: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => Promise<void>;
   updateItemInList: (listId: string, item: Item) => Promise<void>;
   deleteItemInList: (listId: string, itemId: string) => void;
   toggleItemChecked: (listId: string, itemId: string) => void;
@@ -142,85 +142,144 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate({ type: 'lists' });
   }
 
-  const runAutoCorrect = async (item: Omit<Item, 'id'>): Promise<Item> => {
+  const runItemProcessing = async (item: Omit<Item, 'id'>): Promise<Item> => {
     try {
-      const corrected = await autoCorrectItem({ name: item.name });
+      const processed = await processItem({ name: item.name });
       return {
         id: uuidv4(),
         ...item,
-        name: corrected.name,
-        category: corrected.category,
-        icon: corrected.icon,
+        name: processed.name,
+        canonicalName: processed.canonicalName,
+        category: processed.category,
+        icon: processed.icon,
       };
     } catch (e) {
-      console.error("AI auto-correction failed:", e);
+      console.error("AI item processing failed:", e);
       toast({
         variant: "destructive",
-        title: "AI Correction Failed",
-        description: "Could not correct item details. Using original values.",
+        title: "AI Processing Failed",
+        description: "Could not process item details. Using original values.",
       });
       // Fallback to a non-AI generated item
-      return { id: uuidv4(), ...item, category: item.category || 'Other', icon: item.icon || '🛒' };
+      return { id: uuidv4(), ...item, canonicalName: item.name, category: item.category || 'Other', icon: item.icon || '🛒' };
     }
   };
-  
-  const addOrMergeItem = (list: List, itemToAdd: Item): List => {
-    const existingItemIndex = list.items.findIndex(
-      (item) => item.name.toLowerCase() === itemToAdd.name.toLowerCase() && !item.checked
-    );
 
-    if (existingItemIndex > -1) {
-      // Merge with existing item
+  const addSmartItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => {
+    vibrate();
+    const newItem: Item = { ...itemData, id: uuidv4(), checked: false, canonicalName: itemData.canonicalName || itemData.name };
+
+    setLists(prevLists => prevLists.map(list => {
+      if (list.id !== listId) {
+        return list;
+      }
+
       const newItems = [...list.items];
-      const existingItem = newItems[existingItemIndex];
-      
-      const combinedNotes = [existingItem.notes, itemToAdd.notes].filter(Boolean).join(', ');
 
-      newItems[existingItemIndex] = {
-        ...existingItem,
-        qty: existingItem.qty + itemToAdd.qty,
-        urgent: existingItem.urgent || itemToAdd.urgent,
-        notes: combinedNotes,
-        // Keep other properties from the existing item, but you could decide to update them
-      };
-      return { ...list, items: newItems };
-    } else {
-      // Add as new item
-      return { ...list, items: [...list.items, itemToAdd] };
-    }
-  };
+      const representativeItem = newItems.find(i => i.canonicalName === newItem.canonicalName);
+      const targetCategory = representativeItem ? representativeItem.category : newItem.category;
+      newItem.category = targetCategory;
 
+      const mergeCandidateIndex = newItems.findIndex(
+          i => i.canonicalName === newItem.canonicalName && i.notes === newItem.notes && !i.checked
+      );
 
-  const addSmartItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
-     vibrate();
-     const newItem: Item = { ...itemData, id: uuidv4(), checked: false };
-     setLists(prevLists => prevLists.map(list => {
-       if (list.id === listId) {
-         return addOrMergeItem(list, newItem);
-       }
-       return list;
-     }));
+      if (mergeCandidateIndex > -1) {
+          const existingItem = newItems[mergeCandidateIndex];
+          newItems[mergeCandidateIndex] = {
+              ...existingItem,
+              qty: existingItem.qty + newItem.qty,
+              urgent: existingItem.urgent || newItem.urgent,
+          };
+      } else {
+          newItems.push(newItem);
+      }
+
+      const finalCategory = (newItems.find(i => i.canonicalName === newItem.canonicalName) || newItem).category;
+      const syncedItems = newItems.map(i => 
+          i.canonicalName === newItem.canonicalName ? { ...i, category: finalCategory } : i
+      );
+
+      return { ...list, items: syncedItems };
+    }));
   };
 
   const addItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
     vibrate();
-    const newItem = await runAutoCorrect(itemData);
-    setLists(lists.map(list => {
-      if (list.id === listId) {
-        return addOrMergeItem(list, { ...newItem, checked: false });
+    const processedItem = await runItemProcessing({ ...itemData, checked: false });
+
+    setLists(lists => lists.map(list => {
+      if (list.id !== listId) {
+        return list;
       }
-      return list;
+
+      const newItems = [...list.items];
+
+      const representativeItem = newItems.find(i => i.canonicalName === processedItem.canonicalName);
+      const targetCategory = representativeItem ? representativeItem.category : processedItem.category;
+      processedItem.category = targetCategory;
+
+      const mergeCandidateIndex = newItems.findIndex(
+        i => i.canonicalName === processedItem.canonicalName && i.notes === processedItem.notes && !i.checked
+      );
+
+      if (mergeCandidateIndex > -1) {
+        const existingItem = newItems[mergeCandidateIndex];
+        newItems[mergeCandidateIndex] = {
+          ...existingItem,
+          qty: existingItem.qty + processedItem.qty,
+          urgent: existingItem.urgent || processedItem.urgent,
+        };
+      } else {
+        newItems.push(processedItem);
+      }
+      
+      const finalCategory = (newItems.find(i => i.canonicalName === processedItem.canonicalName) || processedItem).category;
+      const syncedItems = newItems.map(i => 
+          i.canonicalName === processedItem.canonicalName ? { ...i, category: finalCategory } : i
+      );
+
+      return { ...list, items: syncedItems };
     }));
   };
 
   const updateItemInList = async (listId: string, updatedItem: Item) => {
     vibrate();
-    const correctedItem = await runAutoCorrect(updatedItem);
-    setLists(lists.map(list => {
-      if (list.id === listId) {
-        return { ...list, items: list.items.map(item => item.id === updatedItem.id ? { ...correctedItem, id: updatedItem.id } : item) };
+    const processedItem = await runItemProcessing(updatedItem);
+
+    setLists(lists => lists.map(list => {
+      if (list.id !== listId) {
+        return list;
       }
-      return list;
+      
+      const itemsWithoutOriginal = list.items.filter(i => i.id !== updatedItem.id);
+      const newItems = [...itemsWithoutOriginal];
+
+      const representativeItem = newItems.find(i => i.canonicalName === processedItem.canonicalName);
+      const targetCategory = representativeItem ? representativeItem.category : processedItem.category;
+      processedItem.category = targetCategory;
+
+      const mergeCandidateIndex = newItems.findIndex(
+        i => i.canonicalName === processedItem.canonicalName && i.notes === processedItem.notes && !i.checked
+      );
+
+      if (mergeCandidateIndex > -1) {
+        const existingItem = newItems[mergeCandidateIndex];
+        newItems[mergeCandidateIndex] = {
+          ...existingItem,
+          qty: existingItem.qty + processedItem.qty,
+          urgent: existingItem.urgent || processedItem.urgent,
+        };
+      } else {
+        newItems.push({ ...processedItem, id: updatedItem.id, checked: updatedItem.checked });
+      }
+
+      const finalCategory = (newItems.find(i => i.canonicalName === processedItem.canonicalName) || processedItem).category;
+      const syncedItems = newItems.map(i => 
+        i.canonicalName === processedItem.canonicalName ? { ...i, category: finalCategory } : i
+      );
+
+      return { ...list, items: syncedItems };
     }));
   };
 
@@ -266,19 +325,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addRecipeToList = (recipeId: string, listId: string) => {
     vibrate();
     const recipe = recipes.find(r => r.id === recipeId);
-    const targetList = lists.find(l => l.id === listId);
-    if (!recipe || !targetList) return;
-
-    let updatedList = { ...targetList };
-    recipe.ingredients.forEach(ingredient => {
-      const itemToAdd: Item = { ...ingredient, id: uuidv4(), checked: false };
-      updatedList = addOrMergeItem(updatedList, itemToAdd);
+    if (!recipe) return;
+  
+    // Use a function with setLists to ensure we have the latest list state
+    setLists(currentLists => {
+      const targetList = currentLists.find(l => l.id === listId);
+      if (!targetList) return currentLists;
+  
+      let updatedList = { ...targetList };
+  
+      recipe.ingredients.forEach(ingredient => {
+        const itemToAdd: Item = { 
+          ...ingredient, 
+          id: uuidv4(), 
+          checked: false, 
+          canonicalName: ingredient.canonicalName || ingredient.name // Ensure canonicalName
+        };
+  
+        const newItems = [...updatedList.items];
+        
+        const representativeItem = newItems.find(i => i.canonicalName === itemToAdd.canonicalName);
+        const targetCategory = representativeItem ? representativeItem.category : itemToAdd.category || 'Other';
+  
+        const mergeCandidateIndex = newItems.findIndex(
+          i => i.canonicalName === itemToAdd.canonicalName && i.notes === itemToAdd.notes && !i.checked
+        );
+  
+        if (mergeCandidateIndex > -1) {
+          const existingItem = newItems[mergeCandidateIndex];
+          newItems[mergeCandidateIndex] = {
+            ...existingItem,
+            qty: existingItem.qty + itemToAdd.qty,
+            urgent: existingItem.urgent || itemToAdd.urgent,
+            category: targetCategory, // Sync category
+          };
+        } else {
+          newItems.push({ ...itemToAdd, category: targetCategory });
+        }
+  
+        updatedList.items = newItems;
+      });
+  
+      toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} were added to your list.` });
+      navigate({ type: 'listDetail', listId });
+      
+      return currentLists.map(list => list.id === listId ? updatedList : list);
     });
-
-    setLists(lists.map(list => list.id === listId ? updatedList : list));
-
-    toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} were added to your list.` });
-    navigate({ type: 'listDetail', listId });
   };
 
   const updateSettings = (newSettings: Partial<Settings>) => {

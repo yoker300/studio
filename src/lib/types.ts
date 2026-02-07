@@ -3,6 +3,7 @@ import { GenerateRecipeOutput } from "@/ai/flows/ai-generate-recipe";
 export type Item = {
   id: string;
   name: string;
+  canonicalName?: string;
   category: string;
   qty: number;
   urgent: boolean;

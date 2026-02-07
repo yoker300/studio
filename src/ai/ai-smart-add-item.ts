@@ -21,6 +21,7 @@ export type SmartAddItemInput = z.infer<typeof SmartAddItemInputSchema>;
 const SmartAddItemOutputSchema = z.array(
   z.object({
     name: z.string().describe('The name of the item.'),
+    canonicalName: z.string().optional().describe('The standardized, canonical English name for the item.'),
     qty: z.number().optional().describe('The quantity of the item.'),
     category: z.string().optional().describe('The category of the item.'),
     urgent: z.boolean().optional().describe('Whether the item is urgent.'),
@@ -37,7 +38,7 @@ const smartAddItemPrompt = ai.definePrompt({
   name: 'smartAddItemPrompt',
   input: {schema: SmartAddItemInputSchema},
   output: {schema: SmartAddItemOutputSchema},
-  prompt: `You are a shopping list assistant. The user will provide voice input, and you will parse it to extract a JSON array of items to add to the shopping list. Use conservative quantities. If no quantity is provided, assume the item is not urgent, and make a best guess at categorization based on the item name.
+  prompt: `You are a shopping list assistant. The user will provide voice input, and you will parse it to extract a JSON array of items to add to the shopping list. Use conservative quantities. If no quantity is provided, assume the item is not urgent, and make a best guess at categorization based on the item name. For each item, provide a 'canonicalName' which is the standardized English name.
 
 Voice Input: {{{voiceInput}}}`,
 });
