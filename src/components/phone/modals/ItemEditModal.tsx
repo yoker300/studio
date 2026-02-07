@@ -24,7 +24,8 @@ import { useToast } from '@/hooks/use-toast';
 const itemSchema = z.object({
   icon: z.string().min(1, "Icon is required."),
   name: z.string().min(1, 'Item name cannot be empty.'),
-  qty: z.number().min(1, 'Quantity must be at least 1.'),
+  qty: z.number().min(0.01, 'Quantity must be greater than 0.'),
+  unit: z.string().optional(),
   store: z.string().optional(),
   notes: z.string().optional(),
   urgent: z.boolean(),
@@ -58,6 +59,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       icon: '🛒',
       name: '',
       qty: 1,
+      unit: '',
       store: '',
       notes: '',
       urgent: false,
@@ -72,18 +74,19 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           icon: item.icon || '🛒',
           name: item.name,
           qty: item.qty,
+          unit: item.unit,
           store: item.store,
           notes: item.notes,
           urgent: item.urgent,
           gf: item.gf,
         });
-        // For editing, focus the name input for quick changes.
         setTimeout(() => nameInputRef.current?.focus(), 100);
       } else {
         reset({
           icon: '🛒',
           name: '',
           qty: 1,
+          unit: '',
           store: '',
           notes: '',
           urgent: false,
@@ -111,15 +114,16 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     const itemData = {
       ...data,
       category: item?.category || '',
+      unit: data.unit || '',
       notes: data.notes || '',
       store: data.store || '',
     };
     
     try {
-      if (item) { // Editing existing item
+      if (item) { 
         await updateItemInList(listId, { ...item, ...itemData });
         toast({ title: "Item Updated", description: `${data.name} has been updated.`});
-      } else { // Adding new item
+      } else {
         await addItemToList(listId, { ...itemData, checked: false });
         toast({ title: "Item Added", description: `${data.name} has been added to your list.`});
       }
@@ -163,7 +167,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           </div>
 
           <div className="space-y-3">
-            {/* Quantity */}
+            {/* Quantity & Unit */}
             <div className="p-2 bg-muted rounded-lg">
               <label className="text-sm font-bold text-foreground">Quantity</label>
               {smartQuantityRule ? (
@@ -176,8 +180,9 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               ) : (
                 <div className="flex items-center gap-2 mt-2">
                   <Button type="button" size="icon" variant="outline" onClick={() => setValue('qty', Math.max(1, watchedQty - 1))}><Minus className="h-4 w-4" /></Button>
-                  <Controller name="qty" control={control} render={({ field }) => <Input {...field} type="number" className="w-16 text-center text-lg" onChange={e => field.onChange(parseInt(e.target.value) || 1)} />} />
+                  <Controller name="qty" control={control} render={({ field }) => <Input {...field} type="number" step="0.1" className="w-20 text-center text-lg" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />} />
                   <Button type="button" size="icon" variant="outline" onClick={() => setValue('qty', watchedQty + 1)}><Plus className="h-4 w-4" /></Button>
+                  <Controller name="unit" control={control} render={({ field }) => <Input {...field} placeholder="Unit (g, ml, cup...)" className="flex-1" />} />
                 </div>
               )}
             </div>

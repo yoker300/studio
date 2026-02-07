@@ -21,6 +21,8 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
 
   const { toggleItemChecked } = context;
 
+  const quantityDisplay = item.unit ? `${item.qty} ${item.unit}` : (item.qty > 1 ? `x${item.qty}`: null);
+
   return (
     <Card
       onClick={onEdit}
@@ -39,7 +41,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
           className="mt-1 h-6 w-6 rounded-full"
         />
         <div className="flex-1 grid gap-1" onClick={onEdit}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xl">{item.icon}</span>
             <span
               className={cn(
@@ -50,8 +52,8 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
             >
               {item.name}
             </span>
-            {item.qty > 1 && (
-              <Badge variant="secondary">x{item.qty}</Badge>
+            {quantityDisplay && (
+              <Badge variant="secondary">{quantityDisplay}</Badge>
             )}
              {item.gf && (
               <Badge variant="outline" className="text-green-600 border-green-200">

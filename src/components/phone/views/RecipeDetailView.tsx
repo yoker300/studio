@@ -138,10 +138,10 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
                 <li key={ing.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-md">
                     <span className="text-xl">{ing.icon || '🛒'}</span>
                     <div className="flex-1">
-                        <span>{ing.name}</span>
+                        <span className="font-medium">{ing.name}</span>
                         {ing.notes && <span className="text-sm text-muted-foreground ml-2">({ing.notes})</span>}
                     </div>
-                    <Badge variant="secondary">x{ing.qty}</Badge>
+                    <Badge variant="secondary">{ing.qty} {ing.unit || ''}</Badge>
                 </li>
             ))}
             </ul>

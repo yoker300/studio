@@ -18,6 +18,7 @@ const ingredientSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Ingredient name is required.'),
   qty: z.number().positive("Quantity must be a positive number."),
+  unit: z.string().optional(),
   icon: z.string(),
   notes: z.string().optional(),
 });
@@ -74,6 +75,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
         id: ing.id,
         name: ing.name,
         qty: ing.qty,
+        unit: ing.unit || '',
         icon: ing.icon || '🛒',
         notes: ing.notes || '',
       }));
@@ -88,7 +90,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
             name: generatedRecipe.name,
             icon: generatedRecipe.icon,
             image: PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)]?.imageUrl || 'https://picsum.photos/seed/newrecipe/600/400',
-            ingredients: generatedRecipe.ingredients.map(ing => ({ ...ing, id: uuidv4(), qty: ing.qty || 1, icon: ing.icon || '🛒' })),
+            ingredients: generatedRecipe.ingredients.map(ing => ({ ...ing, id: uuidv4(), qty: ing.qty || 1, unit: ing.unit || '', icon: ing.icon || '🛒', notes: ing.notes || '' })),
         })
     }
   }, [isEditing, recipe, generatedRecipe, reset]);
@@ -214,17 +216,24 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
                         name={`ingredients.${index}.name` as const}
                         render={({ field }) => <Input {...field} placeholder="Ingredient Name" />}
                       />
-                       <Controller
+                      <Controller
                         control={control}
                         name={`ingredients.${index}.notes` as const}
                         render={({ field }) => <Input {...field} placeholder="Notes (e.g. 'diced')" className="text-xs h-7" />}
                       />
                     </div>
-                     <Controller
-                        control={control}
-                        name={`ingredients.${index}.qty` as const}
-                        render={({ field }) => <Input {...field} type="number" step="0.01" className="w-16" min={0} onChange={e => field.onChange(parseFloat(e.target.value) || 0)}/>}
-                      />
+                    <div className='flex gap-1'>
+                      <Controller
+                          control={control}
+                          name={`ingredients.${index}.qty` as const}
+                          render={({ field }) => <Input {...field} type="number" step="0.01" className="w-16" min={0} onChange={e => field.onChange(parseFloat(e.target.value) || 0)}/>}
+                        />
+                        <Controller
+                          control={control}
+                          name={`ingredients.${index}.unit` as const}
+                          render={({ field }) => <Input {...field} placeholder="Unit" className="w-16" />}
+                        />
+                    </div>
                     <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -232,7 +241,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
                 ))}
                  {errors.ingredients && <p className="text-destructive text-sm">{errors.ingredients.message || errors.ingredients.root?.message}</p>}
               </div>
-              <Button type="button" variant="outline" className="mt-2 w-full" onClick={() => append({ id: uuidv4(), name: '', qty: 1, icon: '🛒', notes: '' })}>
+              <Button type="button" variant="outline" className="mt-2 w-full" onClick={() => append({ id: uuidv4(), name: '', qty: 1, unit: '', icon: '🛒', notes: '' })}>
                 <Plus className="mr-2 h-4 w-4" /> Add Ingredient
               </Button>
             </div>

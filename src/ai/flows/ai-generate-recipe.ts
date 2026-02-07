@@ -26,7 +26,8 @@ const GenerateRecipeOutputSchema = z.object({
         z.object({
             name: z.string().describe('The name of the ingredient.'),
             qty: z.number().optional().describe('The quantity of the ingredient.'),
-            notes: z.string().optional().describe("A short note about the ingredient, containing only the unit of measurement like 'cups', 'tbsp', or preparation notes like 'diced' or 'to taste'. Do NOT include the quantity number in this field."),
+            unit: z.string().optional().describe("The unit of measurement for the quantity (e.g., 'g', 'ml', 'cups')."),
+            notes: z.string().optional().describe("Additional preparation notes (e.g., 'diced', 'melted', 'to taste'). Do NOT include the quantity or unit in this field."),
             icon: z.string().optional().describe('An emoji icon for the ingredient.'),
         })
     ),
@@ -41,7 +42,7 @@ const generateRecipePrompt = ai.definePrompt({
   name: 'generateRecipePrompt',
   input: {schema: GenerateRecipeInputSchema},
   output: {schema: GenerateRecipeOutputSchema},
-  prompt: `You are a shopping list assistant and expert chef. The user will provide a recipe name, and you will parse it to extract a JSON object containing the recipe name, a suitable emoji icon, and an array of common ingredients for that recipe. Use conservative quantities for a standard version of the recipe. For each ingredient, provide the numeric quantity in the 'qty' field and the unit of measurement (e.g., "cups", "tbsp") or a preparation note (e.g., "diced") in the 'notes' field. The 'notes' field should NOT contain numbers.
+  prompt: `You are a shopping list assistant and expert chef. The user will provide a recipe name, and you will parse it to extract a JSON object containing the recipe name, a suitable emoji icon, and an array of common ingredients for that recipe. Use conservative quantities for a standard version of the recipe. For each ingredient, provide the numeric quantity in the 'qty' field, the unit of measurement (e.g., "cups", "tbsp") in the 'unit' field, and any preparation notes (e.g., "diced") in the 'notes' field. The 'notes' and 'unit' fields should NOT contain numbers.
   
 Recipe Name: {{{recipeName}}}`,
 });

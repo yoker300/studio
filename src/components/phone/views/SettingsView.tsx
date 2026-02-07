@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -16,15 +17,12 @@ import {
 } from "@/components/ui/select"
 import { Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { SmartQuantity } from '@/lib/types';
-
 
 const SettingsView = () => {
   const context = useContext(AppContext);
   const { toast } = useToast();
   const [newStore, setNewStore] = useState('');
   
-  // State for adding new smart quantity
   const [newSQItemName, setNewSQItemName] = useState('');
   const [newSQQuantities, setNewSQQuantities] = useState('');
 
@@ -44,7 +42,6 @@ const SettingsView = () => {
   };
   
   const handleProfileSave = () => {
-    // In a real app, this would hit an API
     toast({ title: 'Profile Saved!', description: 'Your profile details have been updated.' });
   }
 
@@ -141,13 +138,13 @@ const SettingsView = () => {
         </CardContent>
       </Card>
 
-      {/* Appearance Card */}
+      {/* Appearance & Behavior Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Customize the look and feel of the app.</CardDescription>
+          <CardTitle>Appearance & Behavior</CardTitle>
+          <CardDescription>Customize the look, feel, and functionality of the app.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <Label htmlFor="dark-mode">Dark Mode</Label>
             <Switch
@@ -170,6 +167,27 @@ const SettingsView = () => {
                 <SelectItem value="large">Large</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-3">
+             <Label>Item Merging Behavior</Label>
+             <RadioGroup 
+                value={settings.mergeBehavior} 
+                onValueChange={(value: 'strict' | 'smart') => updateSettings({ mergeBehavior: value })}
+                className="p-2 bg-muted rounded-lg"
+             >
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="strict" id="merge-strict" />
+                    <Label htmlFor="merge-strict" className="font-normal">
+                        <span className="font-bold">Strict</span>: Merge items only if units are identical.
+                    </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="smart" id="merge-smart" />
+                    <Label htmlFor="merge-smart" className="font-normal">
+                        <span className="font-bold">Smart (AI)</span>: Convert units (e.g. cups to grams) to merge.
+                    </Label>
+                </div>
+            </RadioGroup>
           </div>
         </CardContent>
       </Card>

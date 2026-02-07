@@ -6,10 +6,11 @@ export type Item = {
   canonicalName?: string;
   category: string;
   qty: number;
+  unit?: string;
   urgent: boolean;
   icon: string; // emoji
   store: string;
-  notes: string;
+  notes?: string;
   checked: boolean;
   gf: boolean;
 };
@@ -24,7 +25,7 @@ export type Recipe = {
 };
 
 export type List = {
-  id: string;
+  id:string;
   name:string;
   icon: string; // emoji
   items: Item[];
@@ -43,6 +44,7 @@ export type Settings = {
   email: string;
   smartQuantities: SmartQuantity[];
   storePresets: string[];
+  mergeBehavior: 'strict' | 'smart';
 };
 
 export type View =

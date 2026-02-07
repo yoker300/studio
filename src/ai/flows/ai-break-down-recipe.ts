@@ -23,6 +23,8 @@ const BreakDownRecipeOutputSchema = z.array(
   z.object({
     name: z.string().describe('The name of the ingredient.'),
     qty: z.number().optional().describe('The quantity of the ingredient.'),
+    unit: z.string().optional().describe("The unit of measurement for the quantity (e.g., 'g', 'ml', 'cups')."),
+    notes: z.string().optional().describe("Additional preparation notes (e.g., 'diced', 'to taste')."),
     category: z.string().optional().describe('The category of the ingredient.'),
     urgent: z.boolean().optional().describe('Whether the ingredient is urgent.'),
     icon: z.string().optional().describe('An emoji icon for the ingredient.'),
@@ -38,7 +40,7 @@ const breakDownRecipePrompt = ai.definePrompt({
   name: 'breakDownRecipePrompt',
   input: {schema: BreakDownRecipeInputSchema},
   output: {schema: BreakDownRecipeOutputSchema},
-  prompt: `You are a shopping list assistant and expert chef. The user will provide a recipe name, and you will parse it to extract a JSON array of common ingredients for that recipe. Use conservative quantities for a standard version of the recipe.
+  prompt: `You are a shopping list assistant and expert chef. The user will provide a recipe name, and you will parse it to extract a JSON array of common ingredients for that recipe. Use conservative quantities for a standard version of the recipe. For each ingredient, provide the numeric quantity in 'qty', the unit of measurement (e.g., "cups", "tbsp") in 'unit', and preparation notes (e.g., "diced") in 'notes'.
   
 Recipe Name: {{{recipeName}}}`,
 });
