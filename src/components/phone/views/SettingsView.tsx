@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -167,27 +166,6 @@ const SettingsView = () => {
                 <SelectItem value="large">Large</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-3">
-             <Label>Item Merging Behavior</Label>
-             <RadioGroup 
-                value={settings.mergeBehavior} 
-                onValueChange={(value: 'strict' | 'smart') => updateSettings({ mergeBehavior: value })}
-                className="p-2 bg-muted rounded-lg"
-             >
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="strict" id="merge-strict" />
-                    <Label htmlFor="merge-strict" className="font-normal">
-                        <span className="font-bold">Strict</span>: Merge items only if units are identical.
-                    </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="smart" id="merge-smart" />
-                    <Label htmlFor="merge-smart" className="font-normal">
-                        <span className="font-bold">Smart (AI)</span>: Convert units (e.g. cups to grams) to merge.
-                    </Label>
-                </div>
-            </RadioGroup>
           </div>
         </CardContent>
       </Card>

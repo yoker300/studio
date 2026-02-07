@@ -42,7 +42,6 @@ export type Settings = {
   email: string;
   smartQuantities: SmartQuantity[];
   storePresets: string[];
-  mergeBehavior: 'strict' | 'smart';
 };
 
 export type View =
@@ -101,12 +100,16 @@ export type GenerateRecipeOutput = {
 
 export type ProcessItemInput = {
   name: string;
+  qty: number;
+  unit?: string;
 };
 export type ProcessItemOutput = {
   name: string;
   canonicalName: string;
   category: string;
   icon: string;
+  qty: number;
+  unit?: string;
 };
 
 export type ConvertUnitsInput = {

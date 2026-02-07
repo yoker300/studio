@@ -4,7 +4,6 @@ import { createContext, useState, useEffect, ReactNode, useCallback } from 'reac
 import { List, Recipe, Settings, Item, View, GenerateRecipeOutput } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
 import { processItem } from '@/ai/flows/ai-process-item';
-import { convertUnits } from '@/ai/flows/ai-convert-units';
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_SETTINGS: Settings = {
@@ -17,7 +16,6 @@ const DEFAULT_SETTINGS: Settings = {
     { itemName: 'Water', quantities: [6, 12, 24] },
   ],
   storePresets: ['SuperMart', 'GroceryHub', 'FreshCo', 'PantryPlus'],
-  mergeBehavior: 'strict',
 };
 
 const DUMMY_RECIPES: Recipe[] = [
@@ -143,9 +141,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate({ type: 'lists' });
   }
 
-  const runItemProcessing = async (item: Omit<Item, 'id'>): Promise<Item> => {
+  const runItemProcessing = async (item: Omit<Item, 'id' | 'checked'>): Promise<Item> => {
     try {
-      const processed = await processItem({ name: item.name });
+      const processed = await processItem({
+        name: item.name,
+        qty: item.qty,
+        unit: item.unit,
+       });
       return {
         id: uuidv4(),
         ...item,
@@ -153,6 +155,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         canonicalName: processed.canonicalName,
         category: processed.category,
         icon: processed.icon,
+        qty: processed.qty,
+        unit: processed.unit,
+        checked: false,
       };
     } catch (e) {
       console.error("AI item processing failed:", e);
@@ -161,16 +166,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         title: "AI Processing Failed",
         description: "Could not process item details. Using original values.",
       });
-      return { id: uuidv4(), ...item, canonicalName: item.name, category: item.category || 'Other', icon: item.icon || '🛒' };
+      return { 
+        id: uuidv4(), 
+        ...item, 
+        canonicalName: item.name, 
+        category: item.category || 'Other', 
+        icon: item.icon || '🛒',
+        checked: false,
+      };
     }
   };
 
-  const _addItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>, skipProcessing = false) => {
+  const _addItemToList = async (listId: string, itemData: Omit<Item, 'id'>, skipProcessing = false) => {
     vibrate();
   
     const newItem = skipProcessing 
-      ? { ...itemData, id: uuidv4(), checked: false, canonicalName: itemData.canonicalName || itemData.name } 
-      : await runItemProcessing({ ...itemData, checked: false });
+      ? { ...itemData, id: uuidv4() } 
+      : await runItemProcessing(itemData);
   
     setLists(prevLists => {
       const listIndex = prevLists.findIndex(l => l.id === listId);
@@ -183,38 +195,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const representativeItem = newItems.find(i => i.canonicalName === newItem.canonicalName);
       newItem.category = representativeItem?.category || newItem.category;
   
+      // Attempt to merge the item
       const mergeCandidateIndex = newItems.findIndex(i => 
         !i.checked &&
         i.canonicalName === newItem.canonicalName &&
+        i.unit === newItem.unit && // Units must now match after standardization
         i.notes === newItem.notes
       );
   
-      let merged = false;
       if (mergeCandidateIndex > -1) {
         const candidate = newItems[mergeCandidateIndex];
-  
-        if (settings.mergeBehavior === 'strict') {
-          if (candidate.unit === newItem.unit) {
-            candidate.qty += newItem.qty;
-            candidate.urgent = candidate.urgent || newItem.urgent;
-            merged = true;
-          }
-        } else { // 'smart' merge
-          const [newItemConv, candConv] = await Promise.all([
-            convertUnits({ name: newItem.name, qty: newItem.qty, unit: newItem.unit }),
-            convertUnits({ name: candidate.name, qty: candidate.qty, unit: candidate.unit })
-          ]);
-  
-          if (!newItemConv.error && !candConv.error && newItemConv.unit === candConv.unit) {
-            candidate.qty = (newItemConv.qty || 0) + (candConv.qty || 0);
-            candidate.unit = newItemConv.unit;
-            candidate.urgent = candidate.urgent || newItem.urgent;
-            merged = true;
-          }
-        }
-      }
-  
-      if (!merged) {
+        candidate.qty += newItem.qty;
+        candidate.urgent = candidate.urgent || newItem.urgent;
+      } else {
         newItems.push(newItem);
       }
       
@@ -231,11 +224,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addSmartItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => {
-    await _addItemToList(listId, itemData, true);
+    await _addItemToList(listId, { ...itemData, checked: false }, true);
   };
   
   const addItemToList = async (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
-    await _addItemToList(listId, itemData, false);
+    await _addItemToList(listId, { ...itemData, checked: false }, false);
   };
 
   const updateItemInList = async (listId: string, updatedItem: Item) => {
@@ -304,6 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     recipe.ingredients.forEach(ingredient => {
       _addItemToList(listId, { 
         ...ingredient,
+        checked: false,
         canonicalName: ingredient.canonicalName || ingredient.name
       }, true);
     });
