@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,10 +8,11 @@ import { AppContext } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import Image from 'next/image';
 
 const ingredientSchema = z.object({
   id: z.string(),
@@ -40,12 +41,15 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
   const isEditing = !!recipeId;
   const recipe = context?.recipes.find(r => r.id === recipeId);
   const generatedRecipe = context?.generatedRecipe;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     control,
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors }
   } = useForm<RecipeFormData>({
     resolver: zodResolver(recipeSchema),
@@ -61,6 +65,8 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
     control,
     name: 'ingredients',
   });
+
+  const watchedImage = watch('image');
 
   useEffect(() => {
     if (isEditing && recipe) {
@@ -100,6 +106,7 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
         urgent: false,
         gf: false,
         store: '',
+        canonicalName: ing.name,
       })),
     };
 
@@ -121,6 +128,18 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
     }
     clearGeneratedRecipe();
   }
+  
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setValue('image', reader.result as string, { shouldValidate: true });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   return (
     <div className="p-4">
@@ -146,8 +165,35 @@ const EditRecipeView = ({ recipeId }: EditRecipeViewProps) => {
             {errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
             
             <div>
-                <label className="text-sm font-medium">Image URL</label>
-                <Input {...register('image')} placeholder="https://example.com/image.jpg" />
+                <label className="text-sm font-medium">Recipe Image</label>
+                <div className="mt-1">
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={handleImageUpload}
+                    />
+                    {watchedImage && (
+                        <div className="mb-2 relative">
+                            <Image
+                                src={watchedImage}
+                                alt="Recipe Preview"
+                                width={600}
+                                height={400}
+                                className="w-full h-48 object-cover rounded-md"
+                            />
+                        </div>
+                    )}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {watchedImage ? 'Change Image' : 'Upload Image'}
+                    </Button>
+                </div>
                 {errors.image && <p className="text-destructive text-sm">{errors.image.message}</p>}
             </div>
 
