@@ -13,20 +13,21 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { ConvertUnitsInput, ConvertUnitsOutput } from '@/lib/types';
+
 
 const ConvertUnitsInputSchema = z.object({
   name: z.string().describe('The name of the ingredient.'),
   qty: z.number().describe('The current quantity of the ingredient.'),
   unit: z.string().optional().describe('The current unit of the ingredient (e.g., "cup", "tbsp", "oz").'),
 });
-export type ConvertUnitsInput = z.infer<typeof ConvertUnitsInputSchema>;
+
 
 const ConvertUnitsOutputSchema = z.object({
   qty: z.number().optional().describe('The converted quantity in the base unit.'),
   unit: z.string().optional().describe('The base unit, either "g" for solids or "ml" for liquids.'),
   error: z.string().optional().describe('An error message if the conversion could not be performed.'),
 });
-export type ConvertUnitsOutput = z.infer<typeof ConvertUnitsOutputSchema>;
 
 
 export async function convertUnits(input: ConvertUnitsInput): Promise<ConvertUnitsOutput> {

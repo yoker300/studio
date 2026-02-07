@@ -15,6 +15,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { ProcessItemInput, ProcessItemOutput } from '@/lib/types';
+
 
 const CATEGORY_LIST = [
   'Fruits', 'Vegetables', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Pantry',
@@ -25,7 +27,7 @@ const CATEGORY_LIST = [
 const ProcessItemInputSchema = z.object({
   name: z.string().describe('The name of the item to process, which could be in any language.'),
 });
-export type ProcessItemInput = z.infer<typeof ProcessItemInputSchema>;
+
 
 const ProcessItemOutputSchema = z.object({
   name: z.string().describe('The corrected, original-language name of the item.'),
@@ -33,7 +35,7 @@ const ProcessItemOutputSchema = z.object({
   category: z.string().describe(`The category of the item, chosen from the following fixed list: ${CATEGORY_LIST.join(', ')}`),
   icon: z.string().describe('A single emoji icon that best represents the item.'),
 });
-export type ProcessItemOutput = z.infer<typeof ProcessItemOutputSchema>;
+
 
 export async function processItem(input: ProcessItemInput): Promise<ProcessItemOutput> {
   return processItemFlow(input);

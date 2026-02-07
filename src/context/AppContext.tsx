@@ -1,11 +1,10 @@
 'use client';
 
 import { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { List, Recipe, Settings, Item, View } from '@/lib/types';
+import { List, Recipe, Settings, Item, View, GenerateRecipeOutput } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid'; // Let's use uuid for id generation
 import { processItem } from '@/ai/flows/ai-process-item';
 import { convertUnits } from '@/ai/flows/ai-convert-units';
-import { GenerateRecipeOutput } from '@/ai/flows/ai-generate-recipe';
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_SETTINGS: Settings = {

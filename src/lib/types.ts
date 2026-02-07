@@ -1,5 +1,3 @@
-import { GenerateRecipeOutput } from "@/ai/flows/ai-generate-recipe";
-
 export type Item = {
   id: string;
   name: string;
@@ -58,4 +56,66 @@ export type View =
   | { type: 'addRecipe' }
   | { type: 'editRecipe'; recipeId?: string };
 
-export type GeneratedRecipe = GenerateRecipeOutput;
+
+// AI Flow Types
+
+export type SmartAddItemInput = {
+  voiceInput: string;
+};
+export type SmartAddItemOutput = {
+  name: string;
+  canonicalName?: string;
+  qty?: number;
+  category?: string;
+  urgent?: boolean;
+  icon?: string;
+}[];
+
+export type BreakDownRecipeInput = {
+  recipeName: string;
+};
+export type BreakDownRecipeOutput = {
+  name: string;
+  qty?: number;
+  unit?: string;
+  notes?: string;
+  category?: string;
+  urgent?: boolean;
+  icon?: string;
+}[];
+
+export type GenerateRecipeInput = {
+  recipeName: string;
+};
+export type GenerateRecipeOutput = {
+    name: string;
+    icon: string;
+    ingredients: {
+        name: string;
+        qty?: number;
+        unit?: string;
+        notes?: string;
+        icon?: string;
+    }[];
+};
+
+export type ProcessItemInput = {
+  name: string;
+};
+export type ProcessItemOutput = {
+  name: string;
+  canonicalName: string;
+  category: string;
+  icon: string;
+};
+
+export type ConvertUnitsInput = {
+  name: string;
+  qty: number;
+  unit?: string;
+};
+export type ConvertUnitsOutput = {
+  qty?: number;
+  unit?: string;
+  error?: string;
+};

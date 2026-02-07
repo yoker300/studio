@@ -10,13 +10,13 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { SmartAddItemInput, SmartAddItemOutput } from '@/lib/types';
 
 const SmartAddItemInputSchema = z.object({
   voiceInput: z
     .string()
     .describe('Voice input containing a list of items to add to the shopping list.'),
 });
-export type SmartAddItemInput = z.infer<typeof SmartAddItemInputSchema>;
 
 const SmartAddItemOutputSchema = z.array(
   z.object({
@@ -28,7 +28,6 @@ const SmartAddItemOutputSchema = z.array(
     icon: z.string().optional().describe('The icon for the item.'),
   })
 );
-export type SmartAddItemOutput = z.infer<typeof SmartAddItemOutputSchema>;
 
 export async function smartAddItem(input: SmartAddItemInput): Promise<SmartAddItemOutput> {
   return smartAddItemFlow(input);

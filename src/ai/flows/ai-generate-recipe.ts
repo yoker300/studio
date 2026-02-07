@@ -13,11 +13,13 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { GenerateRecipeInput, GenerateRecipeOutput } from '@/lib/types';
+
 
 const GenerateRecipeInputSchema = z.object({
   recipeName: z.string().describe('The name of the recipe to generate.'),
 });
-export type GenerateRecipeInput = z.infer<typeof GenerateRecipeInputSchema>;
+
 
 const GenerateRecipeOutputSchema = z.object({
     name: z.string().describe('The name of the recipe.'),
@@ -32,7 +34,7 @@ const GenerateRecipeOutputSchema = z.object({
         })
     ),
 });
-export type GenerateRecipeOutput = z.infer<typeof GenerateRecipeOutputSchema>;
+
 
 export async function generateRecipe(input: GenerateRecipeInput): Promise<GenerateRecipeOutput> {
   return generateRecipeFlow(input);

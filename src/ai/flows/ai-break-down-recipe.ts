@@ -13,11 +13,13 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { BreakDownRecipeInput, BreakDownRecipeOutput } from '@/lib/types';
+
 
 const BreakDownRecipeInputSchema = z.object({
   recipeName: z.string().describe('The name of the recipe to break down into ingredients.'),
 });
-export type BreakDownRecipeInput = z.infer<typeof BreakDownRecipeInputSchema>;
+
 
 const BreakDownRecipeOutputSchema = z.array(
   z.object({
@@ -30,7 +32,7 @@ const BreakDownRecipeOutputSchema = z.array(
     icon: z.string().optional().describe('An emoji icon for the ingredient.'),
   })
 );
-export type BreakDownRecipeOutput = z.infer<typeof BreakDownRecipeOutputSchema>;
+
 
 export async function breakDownRecipe(input: BreakDownRecipeInput): Promise<BreakDownRecipeOutput> {
   return breakDownRecipeFlow(input);

@@ -14,10 +14,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Mic, Sparkles, ChefHat, Check, X } from 'lucide-react';
 import { AppContext } from '@/context/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import { smartAddItem, SmartAddItemOutput } from '@/ai/ai-smart-add-item';
-import { breakDownRecipe, BreakDownRecipeOutput } from '@/ai/flows/ai-break-down-recipe';
+import { smartAddItem } from '@/ai/ai-smart-add-item';
+import { breakDownRecipe } from '@/ai/flows/ai-break-down-recipe';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { BreakDownRecipeOutput, SmartAddItemOutput } from '@/lib/types';
 
 type SmartAddModalProps = {
   isOpen: boolean;
