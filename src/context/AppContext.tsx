@@ -5,12 +5,12 @@ import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal
 import { v4 as uuidv4 } from 'uuid';
 import { processItem } from '@/ai/flows/ai-process-item';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useMemoFirebase, useCollection, useDoc } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc, writeBatch, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 
 const DEFAULT_SETTINGS: Settings = {
-  darkMode: true,
+  darkMode: false,
   textSize: 'normal',
   smartQuantities: [
     { itemName: 'Eggs', quantities: [6, 12, 18] },
@@ -68,12 +68,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [mergeProposal, setMergeProposal] = useState<MergeProposal | null>(null);
   const [pendingItemsQueue, setPendingItemsQueue] = useState<(Omit<Item, 'id' | 'checked'> & { listId: string; skipProcessing?: boolean })[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
-
+  
+  // --- Data Fetching ---
   const userOwnedListsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'lists'), where('ownerId', '==', user.uid)) : null, [firestore, user]);
   const userCollaboratingListsQuery = useMemoFirebase(() => user ? query(collection(firestore, 'lists'), where('collaborators', 'array-contains', user.uid)) : null, [firestore, user]);
   const userOwnedRecipesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'recipes'), where('ownerId', '==', user.uid)) : null, [firestore, user]);
   const userCollaboratingRecipesQuery = useMemoFirebase(() => user ? query(collection(firestore, 'recipes'), where('collaborators', 'array-contains', user.uid)) : null, [firestore, user]);
   const usersQuery = useMemoFirebase(() => user ? collection(firestore, 'users') : null, [firestore, user]);
+  
+  const settingsRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid, 'settings', 'app_settings') : null, [firestore, user]);
+  const { data: settingsData, isLoading: loadingSettings } = useDoc<Settings>(settingsRef);
 
   const { data: ownedLists, isLoading: loadingOwnedLists } = useCollection<List>(userOwnedListsQuery);
   const { data: collaboratingLists, isLoading: loadingCollabLists } = useCollection<List>(userCollaboratingListsQuery);
@@ -96,19 +100,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [ownedRecipes, collaboratingRecipes]);
 
   useEffect(() => {
-    if (userProfiles) {
-      setUsers(userProfiles);
-    }
+    if (userProfiles) setUsers(userProfiles);
   }, [userProfiles]);
   
-  const isDataLoading = loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes || loadingUsers || isUserLoading;
+  // Effect to manage settings state from Firestore
+  useEffect(() => {
+    if (user) {
+      if (settingsData === null && !loadingSettings) {
+        // No settings doc exists, create one with defaults
+        setDocumentNonBlocking(settingsRef!, DEFAULT_SETTINGS, { merge: true });
+        setSettings(DEFAULT_SETTINGS);
+      } else if (settingsData) {
+        // Settings doc exists, merge with defaults to ensure all keys are present
+        setSettings(prev => ({ ...prev, ...settingsData }));
+      }
+    } else {
+        // No user, reset to default
+        setSettings(DEFAULT_SETTINGS);
+    }
+  }, [settingsData, loadingSettings, user, settingsRef]);
+  
+  const isDataLoading = loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes || loadingUsers || isUserLoading || loadingSettings;
 
   const activeTab = currentView.type.includes('list') ? 'lists' : currentView.type.includes('recipe') ? 'recipes' : 'settings';
 
   const vibrate = useCallback(() => {
-    if (typeof window !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(10);
-    }
+    if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
   }, []);
 
   const navigate = (view: View) => {
@@ -292,8 +309,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateSettings = (newSettings: Partial<Settings>) => {
+    if (!settingsRef) return;
     vibrate();
-    setSettings(prev => ({...prev, ...newSettings}));
+    const updatedState = { ...settings, ...newSettings };
+    setSettings(updatedState);
+    setDocumentNonBlocking(settingsRef, updatedState, { merge: true });
   };
   
   const addCollaborator = async (entityType: 'list' | 'recipe', entityId: string, email: string): Promise<boolean> => {

@@ -78,6 +78,32 @@
         }
       },
       "required": ["id", "name", "ownerId", "collaborators", "ingredients"]
+    },
+    "Settings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Settings",
+      "type": "object",
+      "description": "Represents a user's application settings.",
+      "properties": {
+        "darkMode": { "type": "boolean" },
+        "textSize": { "type": "string", "enum": ["normal", "large"] },
+        "smartQuantities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemName": { "type": "string" },
+              "quantities": { "type": "array", "items": { "type": "number" } }
+            },
+            "required": ["itemName", "quantities"]
+          }
+        },
+        "storePresets": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["darkMode", "textSize", "smartQuantities", "storePresets"]
     }
   },
   "auth": {
@@ -91,19 +117,23 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
+          "schema": { "$ref": "#/backend/entities/UserProfile" },
           "description": "Stores user profiles. The document ID 'userId' corresponds to the Firebase Auth UID."
+        }
+      },
+      {
+        "path": "/users/{userId}/settings/{settingsId}",
+        "definition": {
+          "entityName": "Settings",
+          "schema": { "$ref": "#/backend/entities/Settings" },
+          "description": "Stores user-specific application settings. settingsId is a singleton document, e.g., 'app_settings'."
         }
       },
       {
         "path": "/lists/{listId}",
         "definition": {
           "entityName": "List",
-          "schema": {
-            "$ref": "#/backend/entities/List"
-          },
+          "schema": { "$ref": "#/backend/entities/List" },
           "description": "Root collection for all shopping lists. Access is controlled by 'ownerId' and the 'collaborators' array within each document."
         }
       },
@@ -111,13 +141,11 @@
         "path": "/recipes/{recipeId}",
         "definition": {
           "entityName": "Recipe",
-          "schema": {
-            "$ref": "#/backend/entities/Recipe"
-          },
+          "schema": { "$ref": "#/backend/entities/Recipe" },
           "description": "Root collection for all recipes. Access is controlled by 'ownerId' and the 'collaborators' array within each document."
         }
       }
     ],
-    "reasoning": "The Firestore data structure is flattened to support direct queries for collaborative features. Lists and recipes are stored in root collections, and security is managed at the document level using 'ownerId' and a 'collaborators' array. This structure allows the application to efficiently query for all lists/recipes a user owns or is a collaborator on in two separate queries, which are then merged on the client. User profiles are stored in a separate root collection, accessible for displaying collaborator information."
+    "reasoning": "The Firestore data structure is flattened to support direct queries for collaborative features. Lists and recipes are stored in root collections, and security is managed at the document level using 'ownerId' and a 'collaborators' array. This structure allows the application to efficiently query for all lists/recipes a user owns or is a collaborator on in two separate queries, which are then merged on the client. User profiles are stored in a separate root collection, accessible for displaying collaborator information. User settings are stored in a subcollection under the user's profile."
   }
 }

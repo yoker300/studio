@@ -10,19 +10,19 @@
     --card-foreground: 240 10% 4%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 4%;
-    --primary: 262 88% 59%;
+    --primary: 205 88% 59%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 10% 4%;
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 46%;
-    --accent: 262 100% 97%;
-    --accent-foreground: 262 88% 59%;
+    --accent: 205 100% 97%;
+    --accent-foreground: 205 88% 59%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 5% 84%;
     --input: 240 5% 90%;
-    --ring: 262 88% 59%;
+    --ring: 205 88% 59%;
     --radius: 0.5rem;
   }
 
@@ -33,19 +33,19 @@
     --card-foreground: 0 0% 98%;
     --popover: 257 22% 16%;
     --popover-foreground: 0 0% 98%;
-    --primary: 262 88% 66%;
+    --primary: 205 88% 66%;
     --primary-foreground: 0 0% 100%;
     --secondary: 257 22% 20%;
     --secondary-foreground: 0 0% 98%;
     --muted: 257 22% 20%;
     --muted-foreground: 240 4% 65%;
-    --accent: 262 50% 30%;
+    --accent: 205 50% 30%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 98%;
     --border: 257 22% 25%;
     --input: 257 22% 25%;
-    --ring: 262 88% 66%;
+    --ring: 205 88% 66%;
   }
 
   .urgent-mode {

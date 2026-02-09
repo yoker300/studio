@@ -7,15 +7,21 @@ service cloud.firestore {
     }
 
     // Rules for user profiles.
-    // Allow any signed-in user to read profiles for collaborator search.
     match /users/{userId} {
+      // Allow any signed-in user to read profiles for collaborator search.
       allow get, list: if isSignedIn();
       
       // A user can only create or update their own profile.
       allow create, update: if isSignedIn() && request.auth.uid == userId;
 
       // Disallow deleting profiles for privacy.
-      allow delete: if false; 
+      allow delete: if false;
+      
+      // Rules for user settings subcollection
+      match /settings/{settingsId} {
+        // A user can only read or write their own settings.
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // Rules for the root 'lists' collection.
