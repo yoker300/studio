@@ -1,7 +1,7 @@
 'use client';
 
 import { useContext } from 'react';
-import { List } from '@/lib/types';
+import { List, UserProfile } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil } from 'lucide-react';
@@ -23,7 +23,9 @@ const ListCard = ({ list }: ListCardProps) => {
   const checkedItems = list.items.filter(item => item.checked).length;
   
   const owner = users.find(u => u.uid === list.ownerId);
-  const collaborators = list.collaborators.map(uid => users.find(u => u.uid === uid)).filter(Boolean);
+  const collaborators = list.collaborators
+    .map(uid => users.find(u => u.uid === uid))
+    .filter((c): c is UserProfile => !!c && c.uid !== list.ownerId);
   const isOwner = user?.uid === list.ownerId;
 
   return (
@@ -39,10 +41,12 @@ const ListCard = ({ list }: ListCardProps) => {
               <AvatarImage src={owner.photoURL} alt={owner.name} />
               <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
             </Avatar>}
-            {collaborators.map(c => c && <Avatar key={c.uid} className="h-6 w-6 border-2 border-background">
-              <AvatarImage src={c.photoURL} alt={c.name} />
-              <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
-            </Avatar>)}
+            {collaborators.map(c => (
+              <Avatar key={c.uid} className="h-6 w-6 border-2 border-background">
+                <AvatarImage src={c.photoURL} alt={c.name} />
+                <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+            ))}
           </div>
         </div>
         {isOwner && (

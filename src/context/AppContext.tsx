@@ -99,14 +99,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Fetch profiles for all collaborators across all lists and recipes
   useEffect(() => {
     if (!user) return;
-    const allCollaboratorIds = new Set<string>();
-    lists.forEach(list => list.collaborators.forEach(id => allCollaboratorIds.add(id)));
-    recipes.forEach(recipe => recipe.collaborators.forEach(id => allCollaboratorIds.add(id)));
+    const allUserIds = new Set<string>();
+
+    lists.forEach(list => {
+      allUserIds.add(list.ownerId);
+      list.collaborators.forEach(id => allUserIds.add(id));
+    });
+    recipes.forEach(recipe => {
+      allUserIds.add(recipe.ownerId);
+      recipe.collaborators.forEach(id => allUserIds.add(id));
+    });
     
     // Always include the current user
-    allCollaboratorIds.add(user.uid);
+    allUserIds.add(user.uid);
 
-    const ids = Array.from(allCollaboratorIds);
+    const ids = Array.from(allUserIds);
     if (ids.length === 0) {
       setUsers([]);
       return;
@@ -127,7 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUsers(userChunks);
     };
 
-    fetchUsers();
+    fetchUsers().catch(console.error);
   }, [lists, recipes, firestore, user]);
 
   
