@@ -4,48 +4,48 @@
 
 @layer base {
   :root {
-    --background: 204 94% 96%;
-    --foreground: 224 76% 12%;
-    --card: 210 80% 98%;
-    --card-foreground: 224 76% 12%;
-    --popover: 210 80% 98%;
-    --popover-foreground: 224 76% 12%;
-    --primary: 206 100% 65%;
-    --primary-foreground: 224 76% 12%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 224 76% 12%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 224 40% 40%;
-    --accent: 60 96% 90%;
-    --accent-foreground: 224 76% 12%;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 262 88% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 4%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 262 100% 97%;
+    --accent-foreground: 262 88% 59%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 40% 90%;
-    --input: 210 40% 90%;
-    --ring: 206 100% 65%;
+    --border: 240 5% 84%;
+    --input: 240 5% 90%;
+    --ring: 262 88% 59%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 224 76% 12%;
-    --foreground: 210 40% 98%;
-    --card: 224 70% 16%;
-    --card-foreground: 210 40% 98%;
-    --popover: 224 70% 16%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 206 90% 50%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 224 50% 24%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 224 50% 24%;
-    --muted-foreground: 210 40% 60%;
-    --accent: 60 80% 40%;
-    --accent-foreground: 210 40% 98%;
+    --background: 257 22% 12%;
+    --foreground: 0 0% 98%;
+    --card: 257 22% 16%;
+    --card-foreground: 0 0% 98%;
+    --popover: 257 22% 16%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 262 88% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 257 22% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 257 22% 20%;
+    --muted-foreground: 240 4% 65%;
+    --accent: 262 50% 30%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 98%;
-    --border: 224 50% 24%;
-    --input: 224 50% 24%;
-    --ring: 206 90% 50%;
+    --border: 257 22% 25%;
+    --input: 257 22% 25%;
+    --ring: 262 88% 66%;
   }
 
   .urgent-mode {

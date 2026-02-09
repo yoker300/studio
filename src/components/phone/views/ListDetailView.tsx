@@ -113,21 +113,21 @@ const ListDetailView = ({ listId }: ListDetailViewProps) => {
         )}
       </div>
 
-      <div className="fixed bottom-24 right-4 flex flex-col gap-3">
+      <div className="fixed bottom-24 right-4 flex flex-col-reverse items-center gap-3">
          <Button
             size="icon"
-            variant="secondary"
-            className="rounded-full h-14 w-14 shadow-lg bg-accent hover:bg-accent/90"
-            onClick={() => setShowSmartAdd(true)}
+            className="rounded-full h-16 w-16 shadow-lg"
+            onClick={() => setEditingItem('new')}
           >
-            <Sparkles className="h-6 w-6" />
+            <Plus className="h-8 w-8" />
           </Button>
          <Button
             size="icon"
-            className="rounded-full h-14 w-14 shadow-lg"
-            onClick={() => setEditingItem('new')}
+            variant="secondary"
+            className="rounded-full h-12 w-12 shadow-lg"
+            onClick={() => setShowSmartAdd(true)}
           >
-            <Plus className="h-6 w-6" />
+            <Sparkles className="h-6 w-6" />
           </Button>
       </div>
       

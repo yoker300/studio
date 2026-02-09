@@ -20,8 +20,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
   if (!context) return null;
 
   const { toggleItemChecked } = context;
-
-  const quantityDisplay = item.unit ? `${item.qty} ${item.unit}` : (item.qty > 1 ? `x${item.qty}`: null);
+  const combinedNotes = [item.unit, item.store, item.notes].filter(Boolean).join(', ');
 
   return (
     <Card
@@ -29,7 +28,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
       className={cn(
         'transition-all duration-300',
         item.checked ? 'bg-muted/50 opacity-60' : 'bg-card',
-        item.urgent && !item.checked && 'border-destructive'
+        item.urgent && !item.checked && 'border-primary'
       )}
     >
       <CardContent className="p-3 flex items-start gap-3">
@@ -38,7 +37,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
           checked={item.checked}
           onClick={(e) => e.stopPropagation()}
           onCheckedChange={() => toggleItemChecked(listId, item.id)}
-          className="mt-1 h-6 w-6 rounded-full"
+          className="mt-1 h-6 w-6"
         />
         <div className="flex-1 grid gap-1" onClick={onEdit}>
           <div className="flex items-center gap-2 flex-wrap">
@@ -47,24 +46,23 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
               className={cn(
                 'font-medium',
                 item.checked && 'line-through',
-                item.urgent && !item.checked && 'text-destructive font-bold'
+                item.urgent && !item.checked && 'text-primary font-bold'
               )}
             >
               {item.name}
             </span>
-            {quantityDisplay && (
-              <Badge variant="secondary">{quantityDisplay}</Badge>
+            {item.qty > 1 && (
+              <Badge variant="secondary">x{item.qty}</Badge>
             )}
              {item.gf && (
-              <Badge variant="outline" className="text-green-600 border-green-200">
+              <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30">
                 <WheatOff className="h-3 w-3 mr-1" /> GF
               </Badge>
             )}
           </div>
-          {(item.store || item.notes) && (
-            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-              {item.store && <Badge variant="outline">{item.store}</Badge>}
-              {item.notes && <p className="text-blue-600 dark:text-blue-400">{item.notes}</p>}
+          {combinedNotes && (
+            <div className="text-sm text-blue-600 dark:text-blue-400 pl-8">
+              <p>{combinedNotes}</p>
             </div>
           )}
         </div>
