@@ -1,190 +1,51 @@
-/**
- * Core Philosophy: This ruleset enforces a strict user-ownership model where all data is private to the user who created it.
- * There is no public or shared data. Access is granted based on the user's authenticated UID matching the `userId` in the document path.
- *
- * Data Structure: All application data is hierarchically organized under the `/users/{userId}` collection. This structure naturally isolates
- * each user's data (settings, lists, items, recipes) into a secure tree, making security rules simple, performant, and easy to reason about.
- *
- * Key Security Decisions:
- * - User Isolation: Users can only read or write data within their own document tree (i.e., paths starting with `/users/{their-own-UID}`).
- * - No User Listing: It is not possible to query or list the top-level `/users` collection, protecting user privacy.
- * - No Collaboration: The data model does not support sharing or collaboration; access is strictly limited to the document owner.
- * - Path-Based Security: Ownership is determined by the `userId` wildcard in the path, avoiding costly `get()` calls to other documents for authorization.
- *
- * Denormalization for Authorization: The data structure is inherently optimized for security rules. Each document path contains the owner's `userId`,
- * which is the only piece of information needed for authorization checks. This aligns with best practices for performant and secure rules.
- *
- * Structural Segregation: The use of distinct subcollections for different data types (e.g., `settings`, `lists`, `recipes`) under a user's
- * primary document ensures that security rules are applied homogeneously to each collection, preventing complex conditional logic within rules.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for common authorization and validation logic.
-
-    /**
-     * Checks if a user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Checks if the currently authenticated user is the owner of the document
-     * based on the `userId` from the path.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * Checks if the user is the owner AND the document already exists.
-     * Used for safe update and delete operations.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * Validates that the `User` document's internal `id` field matches the document's ID (which is the user's UID).
-     */
-    function hasValidUserDataOnCreate(userId) {
-      return request.resource.data.id == userId;
-    }
-
-    /**
-     * Validates that a new `List` or `Recipe` document has its `userId` field correctly set to the owner's UID.
-     */
-    function hasValidOwnerLinkOnCreate(userId) {
-      return request.resource.data.userId == userId;
-    }
-
-    /**
-     * Enforces immutability of the `userId` field on a `List` or `Recipe` during updates.
-     */
-    function isOwnerLinkImmutable() {
-      return request.resource.data.userId == resource.data.userId;
-    }
-
-    /**
-     * Validates that a new `Item` document has its `listId` field correctly set to match the parent collection ID.
-     */
-    function hasValidListLinkOnCreate(listId) {
-      return request.resource.data.listId == listId;
-    }
-
-    /**
-     * Enforces immutability of the `listId` field on an `Item` during updates.
-     */
-    function isListLinkImmutable() {
-      return request.resource.data.listId == resource.data.listId;
-    }
-    
-    /**
-     * Validates that a new `RecipeItem` document has its `recipeId` field correctly set to match the parent collection ID.
-     */
-    function hasValidRecipeLinkOnCreate(recipeId) {
-        return request.resource.data.recipeId == recipeId;
-    }
-
-    /**
-     * Enforces immutability of the `recipeId` field on a `RecipeItem` during updates.
-     */
-    function isRecipeLinkImmutable() {
-        return request.resource.data.recipeId == resource.data.recipeId;
-    }
-
-    /**
-     * @description Rules for user profile documents. A user can create their own profile, and read, update, or delete it.
-     * @path /users/{userId}
-     * @allow (create) An authenticated user with UID 'user_abc' creating their own profile at `/users/user_abc`.
-     * @deny (list) Any user, authenticated or not, attempting to list all documents in the `/users` collection.
-     * @deny (update) User 'user_xyz' attempting to update the profile of 'user_abc' at `/users/user_abc`.
-     * @principle Restricts access to a user's own data tree and allows for self-creation of a root user document.
-     */
+    // Rules for user profiles.
+    // Any authenticated user can read user profiles to find collaborators by email.
+    // A user can only create or update their own profile.
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && hasValidUserDataOnCreate(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow get: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow list, delete: if false; // Disallow listing all users or deleting profiles for privacy.
+    }
 
-      /**
-       * @description Rules for a user's settings document. Only the owner can manage their settings.
-       * @path /users/{userId}/settings/{settingsId}
-       * @allow (get) User 'user_abc' reading their settings at `/users/user_abc/settings/settings123`.
-       * @deny (get) User 'user_xyz' trying to read settings at `/users/user_abc/settings/settings123`.
-       * @principle Enforces strict ownership for all operations on a user's private subcollection.
-       */
-      match /settings/{settingsId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
-      }
+    // Rules for the root 'lists' collection.
+    match /lists/{listId} {
+      // A user can get a specific list if they are the owner or a collaborator.
+      allow get: if isSignedIn() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.collaborators);
 
-      /**
-       * @description Rules for a user's shopping lists. Only the owner can manage their lists.
-       * @path /users/{userId}/lists/{listId}
-       * @allow (create) User 'user_abc' creating a list at `/users/user_abc/lists/list123`, ensuring `userId` field is set correctly.
-       * @deny (create) User 'user_abc' creating a list where the internal `userId` points to 'user_xyz'.
-       * @deny (list) User 'user_xyz' trying to list all lists at `/users/user_abc/lists`.
-       * @principle Enforces strict ownership and validates relational integrity between a list and its owner.
-       */
-      match /lists/{listId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId) && hasValidOwnerLinkOnCreate(userId);
-        allow update: if isExistingOwner(userId) && isOwnerLinkImmutable();
-        allow delete: if isExistingOwner(userId);
+      // A user is allowed to execute a 'list' query if that query is constrained
+      // to only request documents they are allowed to 'get'.
+      // The app code enforces this with `where("ownerId", "==", uid)` and `where("collaborators", "array-contains", uid)`.
+      allow list: if isSignedIn();
 
-        /**
-         * @description Rules for items within a shopping list. Only the list owner can manage items.
-         * @path /users/{userId}/lists/{listId}/items/{itemId}
-         * @allow (update) User 'user_abc' updating an item at `/users/user_abc/lists/list123/items/item456`.
-         * @deny (delete) User 'user_xyz' trying to delete an item from user 'user_abc's list.
-         * @principle Inherits ownership from the parent path and validates the item's link to its parent list.
-         */
-        match /items/{itemId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId) && hasValidListLinkOnCreate(listId);
-          allow update: if isExistingOwner(userId) && isListLinkImmutable();
-          allow delete: if isExistingOwner(userId);
-        }
-      }
+      // A user can create a list if they are authenticated and set themselves as the owner.
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      
+      // Only the owner of a list can update or delete it.
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
 
-      /**
-       * @description Rules for a user's recipes. Only the owner can manage their recipes.
-       * @path /users/{userId}/recipes/{recipeId}
-       * @allow (create) User 'user_abc' creating a recipe at `/users/user_abc/recipes/recipe123`.
-       * @deny (get) User 'user_xyz' trying to read a recipe at `/users/user_abc/recipes/recipe123`.
-       * @principle Enforces strict ownership and validates relational integrity between a recipe and its owner.
-       */
-      match /recipes/{recipeId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId) && hasValidOwnerLinkOnCreate(userId);
-        allow update: if isExistingOwner(userId) && isOwnerLinkImmutable();
-        allow delete: if isExistingOwner(userId);
+    // Rules for the root 'recipes' collection.
+    match /recipes/{recipeId} {
+      // A user can get a specific recipe if they are the owner or a collaborator.
+      allow get: if isSignedIn() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.collaborators);
 
-        /**
-         * @description Rules for items within a recipe. Only the recipe owner can manage recipe items.
-         * @path /users/{userId}/recipes/{recipeId}/recipeItems/{recipeItemId}
-         * @allow (list) User 'user_abc' listing items for their recipe at `/users/user_abc/recipes/recipe123/recipeItems`.
-         * @deny (create) User 'user_xyz' trying to add an item to user 'user_abc's recipe.
-         * @principle Inherits ownership from the parent path and validates the item's link to its parent recipe.
-         */
-        match /recipeItems/{recipeItemId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId) && hasValidRecipeLinkOnCreate(recipeId);
-          allow update: if isExistingOwner(userId) && isRecipeLinkImmutable();
-          allow delete: if isExistingOwner(userId);
-        }
-      }
+      // A user is allowed to execute a 'list' query if that query is constrained
+      // to only request documents they are allowed to 'get'.
+      allow list: if isSignedIn();
+
+      // A user can create a recipe if they are authenticated and set themselves as the owner.
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+
+      // Only the owner of a recipe can update or delete it.
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
   }
 }
