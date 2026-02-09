@@ -1,0 +1,376 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the SmartList application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "The username of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "settingsId": {
+          "type": "string",
+          "description": "Reference to UserSettings. (Relationship: User 1:1 UserSettings)"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "settingsId"
+      ]
+    },
+    "UserSettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserSettings",
+      "type": "object",
+      "description": "Represents the settings for a user, including appearance preferences, store presets, and smart quantities.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserSettings entity."
+        },
+        "darkMode": {
+          "type": "boolean",
+          "description": "Indicates whether dark mode is enabled."
+        },
+        "textSizeLarge": {
+          "type": "boolean",
+          "description": "Indicates whether large text size is enabled."
+        },
+        "storePresets": {
+          "type": "array",
+          "description": "A list of store presets.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "smartQuantities": {
+          "type": "array",
+          "description": "A list of smart quantities, stored as a stringified JSON object.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "darkMode",
+        "textSizeLarge",
+        "storePresets",
+        "smartQuantities"
+      ]
+    },
+    "List": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "List",
+      "type": "object",
+      "description": "Represents a shopping list.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the List entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the list."
+        },
+        "icon": {
+          "type": "string",
+          "description": "The icon (emoji) for the list."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N List)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "icon",
+        "userId"
+      ]
+    },
+    "Item": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Item",
+      "type": "object",
+      "description": "Represents an item in a shopping list.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Item entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the item."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the item (e.g., Dairy, Produce)."
+        },
+        "qty": {
+          "type": "number",
+          "description": "The quantity of the item."
+        },
+        "urgent": {
+          "type": "boolean",
+          "description": "Indicates whether the item is urgent."
+        },
+        "icon": {
+          "type": "string",
+          "description": "The icon (emoji) for the item."
+        },
+        "store": {
+          "type": "string",
+          "description": "The store where the item can be found."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes for the item."
+        },
+        "checked": {
+          "type": "boolean",
+          "description": "Indicates whether the item is checked off."
+        },
+        "gf": {
+          "type": "boolean",
+          "description": "Indicates whether the item is gluten-free."
+        },
+        "listId": {
+          "type": "string",
+          "description": "Reference to List. (Relationship: List 1:N Item)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "qty",
+        "urgent",
+        "icon",
+        "store",
+        "notes",
+        "checked",
+        "gf",
+        "listId"
+      ]
+    },
+    "Recipe": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Recipe",
+      "type": "object",
+      "description": "Represents a recipe.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Recipe entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the recipe."
+        },
+        "icon": {
+          "type": "string",
+          "description": "The icon (emoji) for the recipe."
+        },
+        "image": {
+          "type": "string",
+          "description": "URL of the recipe image.",
+          "format": "uri"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Recipe)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "icon",
+        "image",
+        "userId"
+      ]
+    },
+    "RecipeItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RecipeItem",
+      "type": "object",
+      "description": "Represents an item in a recipe, linking Recipes and Items in a many-to-many relationship.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the RecipeItem entity."
+        },
+        "recipeId": {
+          "type": "string",
+          "description": "Reference to Recipe. (Relationship: Recipe 1:N RecipeItem)"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "Reference to Item. (Relationship: Item 1:N RecipeItem)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the item in the recipe."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes or instructions for the item in the recipe."
+        }
+      },
+      "required": [
+        "id",
+        "recipeId",
+        "itemId",
+        "quantity"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles.  The 'userId' parameter corresponds to the Firebase Auth UID, enabling path-based ownership for user-specific data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user, matching the Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/settings/{settingsId}",
+        "definition": {
+          "entityName": "UserSettings",
+          "schema": {
+            "$ref": "#/backend/entities/UserSettings"
+          },
+          "description": "Stores user-specific settings. Path-based ownership is enforced via the 'userId' parameter. Settings have a unique ID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "settingsId",
+              "description": "The unique identifier for the user settings document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/lists/{listId}",
+        "definition": {
+          "entityName": "List",
+          "schema": {
+            "$ref": "#/backend/entities/List"
+          },
+          "description": "Stores shopping lists owned by a specific user. Path-based ownership is enforced via the 'userId' parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "listId",
+              "description": "The unique identifier for the shopping list."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/lists/{listId}/items/{itemId}",
+        "definition": {
+          "entityName": "Item",
+          "schema": {
+            "$ref": "#/backend/entities/Item"
+          },
+          "description": "Stores items within a specific shopping list owned by a user. Path-based ownership is enforced via the 'userId' and 'listId' parameters.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "listId",
+              "description": "The unique identifier for the shopping list."
+            },
+            {
+              "name": "itemId",
+              "description": "The unique identifier for the item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/recipes/{recipeId}",
+        "definition": {
+          "entityName": "Recipe",
+          "schema": {
+            "$ref": "#/backend/entities/Recipe"
+          },
+          "description": "Stores recipes created by a specific user. Path-based ownership is enforced via the 'userId' parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "recipeId",
+              "description": "The unique identifier for the recipe."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/recipes/{recipeId}/recipeItems/{recipeItemId}",
+        "definition": {
+          "entityName": "RecipeItem",
+          "schema": {
+            "$ref": "#/backend/entities/RecipeItem"
+          },
+          "description": "Stores the items associated with a particular recipe. Path-based ownership is enforced via the 'userId' and 'recipeId' parameters.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "recipeId",
+              "description": "The unique identifier for the recipe."
+            },
+            {
+              "name": "recipeItemId",
+              "description": "The unique identifier for the recipe item."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the SmartList application's features, focusing on user-owned data and collaborative lists.  Each user has their own settings, lists, recipes, and items. This structure facilitates secure and efficient data access while adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Path-based ownership is heavily leveraged to simplify security rules. Authorization Independence is achieved by avoiding `get()` calls in security rules. Data for each user's settings, lists, and recipes are stored under their respective user ID, ensuring that access control can be enforced based on the path structure. The structure supports QAPs (Rules are not Filters) by using structural segregation to ensure that each collection has a homogeneous security posture.  No custom claims are utilized, relying instead on `request.auth.uid` for authentication. The Membership Map pattern is not used in this case because there is no data model for collaborators."
+  }
+}
