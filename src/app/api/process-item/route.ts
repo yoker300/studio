@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { processItem } from '@/ai/flows/ai-process-item';
 import type { ProcessItemInput } from '@/lib/types';
 
+export const maxDuration = 60; // Increase the timeout
+
 export async function POST(request: Request) {
   try {
     const body: ProcessItemInput = await request.json();
