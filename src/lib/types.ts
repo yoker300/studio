@@ -19,7 +19,8 @@ export type Recipe = {
   icon: string; // emoji
   image: string;
   ingredients: Item[];
-  collaborators?: string[];
+  ownerId: string;
+  collaborators: string[]; // array of user uids
 };
 
 export type List = {
@@ -27,8 +28,16 @@ export type List = {
   name:string;
   icon: string; // emoji
   items: Item[];
-  collaborators?: string[];
+  ownerId: string;
+  collaborators: string[]; // array of user uids
 };
+
+export type UserProfile = {
+  uid: string;
+  name: string;
+  email: string;
+  photoURL: string;
+}
 
 export type SmartQuantity = {
   itemName: string;

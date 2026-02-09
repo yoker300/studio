@@ -5,6 +5,7 @@ import { Recipe } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import { AppContext } from '@/context/AppContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 type RecipeCardProps = {
   recipe: Recipe;
@@ -14,11 +15,14 @@ const RecipeCard = ({ recipe }: RecipeCardProps) => {
   const context = useContext(AppContext);
   if (!context) return null;
 
-  const { navigate } = context;
+  const { navigate, users } = context;
+  
+  const owner = users.find(u => u.uid === recipe.ownerId);
+  const collaborators = recipe.collaborators.map(uid => users.find(u => u.uid === uid)).filter(Boolean);
 
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer overflow-hidden" onClick={() => navigate({ type: 'recipeDetail', recipeId: recipe.id })}>
-      <CardHeader className="p-0">
+      <CardHeader className="p-0 relative">
          <Image
             src={recipe.image}
             alt={recipe.name}
@@ -27,6 +31,16 @@ const RecipeCard = ({ recipe }: RecipeCardProps) => {
             className="w-full h-32 object-cover"
             data-ai-hint="food recipe"
         />
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
+          {owner && <Avatar className="h-6 w-6">
+            <AvatarImage src={owner.photoURL} alt={owner.name} />
+            <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
+          </Avatar>}
+          {collaborators.map(c => c && <Avatar key={c.uid} className="h-6 w-6 border-2 border-background">
+            <AvatarImage src={c.photoURL} alt={c.name} />
+            <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+          </Avatar>)}
+        </div>
       </CardHeader>
       <CardContent className="p-4">
         <CardTitle className="font-headline text-xl">{recipe.icon} {recipe.name}</CardTitle>

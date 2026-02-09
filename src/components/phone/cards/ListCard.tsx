@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil } from 'lucide-react';
 import { AppContext } from '@/context/AppContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useUser } from '@/firebase';
 
 type ListCardProps = {
   list: List;
@@ -15,20 +17,39 @@ const ListCard = ({ list }: ListCardProps) => {
   const context = useContext(AppContext);
   if (!context) return null;
 
-  const { navigate } = context;
+  const { user } = useUser();
+  const { navigate, users } = context;
   const totalItems = list.items.length;
   const checkedItems = list.items.filter(item => item.checked).length;
+  
+  const owner = users.find(u => u.uid === list.ownerId);
+  const collaborators = list.collaborators.map(uid => users.find(u => u.uid === uid)).filter(Boolean);
+  const isOwner = user?.uid === list.ownerId;
 
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate({ type: 'listDetail', listId: list.id })}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-3 text-2xl font-headline">
-          <span className="text-4xl">{list.icon}</span>
-          {list.name}
-        </CardTitle>
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate({type: 'editList', listId: list.id}); }}>
-          <Pencil className="h-5 w-5" />
-        </Button>
+      <CardHeader className="flex flex-row items-start justify-between pb-2">
+        <div className="flex-1">
+          <CardTitle className="flex items-center gap-3 text-2xl font-headline">
+            <span className="text-4xl">{list.icon}</span>
+            {list.name}
+          </CardTitle>
+          <div className="flex items-center gap-2 mt-2">
+            {owner && <Avatar className="h-6 w-6">
+              <AvatarImage src={owner.photoURL} alt={owner.name} />
+              <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
+            </Avatar>}
+            {collaborators.map(c => c && <Avatar key={c.uid} className="h-6 w-6 border-2 border-background">
+              <AvatarImage src={c.photoURL} alt={c.name} />
+              <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+            </Avatar>)}
+          </div>
+        </div>
+        {isOwner && (
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate({type: 'editList', listId: list.id}); }}>
+            <Pencil className="h-5 w-5" />
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="text-sm text-muted-foreground">

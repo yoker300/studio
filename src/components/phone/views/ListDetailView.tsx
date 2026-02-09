@@ -5,9 +5,11 @@ import { AppContext } from '@/context/AppContext';
 import { Item } from '@/lib/types';
 import ItemRow from '../cards/ItemCard';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Pencil, Zap, ZapOff, Sparkles, Plus } from 'lucide-react';
+import { ArrowLeft, Pencil, Zap, ZapOff, Sparkles, Plus, Share2 } from 'lucide-react';
 import { ItemEditModal } from '../modals/ItemEditModal';
 import { SmartAddModal } from '../modals/SmartAddModal';
+import { ShareModal } from '../modals/ShareModal';
+import { useUser } from '@/firebase';
 
 type ListDetailViewProps = {
   listId: string;
@@ -17,7 +19,9 @@ const ListDetailView = ({ listId }: ListDetailViewProps) => {
   const context = useContext(AppContext);
   const [editingItem, setEditingItem] = useState<Item | null | 'new'>(null);
   const [showSmartAdd, setShowSmartAdd] = useState(false);
-
+  const [isShareModalOpen, setShareModalOpen] = useState(false);
+  
+  const { user } = useUser();
   const list = context?.lists.find(l => l.id === listId);
 
   const groupedItems = useMemo(() => {
@@ -63,7 +67,9 @@ const ListDetailView = ({ listId }: ListDetailViewProps) => {
     </div>
   );
 
-  const { navigate, urgentMode, setUrgentMode } = context;
+  const { navigate, urgentMode, setUrgentMode, users } = context;
+  const isOwner = user?.uid === list.ownerId;
+  const collaborators = list.collaborators.map(uid => users.find(u => u.uid === uid)).filter(Boolean);
 
   return (
     <>
@@ -75,6 +81,11 @@ const ListDetailView = ({ listId }: ListDetailViewProps) => {
           <h1 className="text-xl font-headline font-bold truncate">{list.icon} {list.name}</h1>
           <p className="text-sm text-muted-foreground">{list.items.filter(i => !i.checked).length} items remaining</p>
         </div>
+        {isOwner && (
+          <Button variant="ghost" size="icon" onClick={() => setShareModalOpen(true)}>
+            <Share2 className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" onClick={() => navigate({ type: 'editList', listId })}>
           <Pencil className="h-5 w-5" />
         </Button>
@@ -130,6 +141,14 @@ const ListDetailView = ({ listId }: ListDetailViewProps) => {
         isOpen={showSmartAdd}
         onClose={() => setShowSmartAdd(false)}
         listId={listId}
+      />
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        entityType="list"
+        entityId={listId}
+        ownerId={list.ownerId}
+        collaborators={collaborators}
       />
     </>
   );

@@ -4,7 +4,7 @@ import { useContext, useState } from 'react';
 import Image from 'next/image';
 import { AppContext } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ShoppingCart, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Pencil, Trash2, Share2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -25,6 +25,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
+import { ShareModal } from '../modals/ShareModal';
+import { useUser } from '@/firebase';
 
 type RecipeDetailViewProps = {
   recipeId: string;
@@ -33,9 +35,11 @@ type RecipeDetailViewProps = {
 const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
   const context = useContext(AppContext);
   const { toast } = useToast();
+  const { user } = useUser();
 
   const recipe = context?.recipes.find(r => r.id === recipeId);
   const [selectedListId, setSelectedListId] = useState<string | null>(context?.lists[0]?.id || null);
+  const [isShareModalOpen, setShareModalOpen] = useState(false);
 
   if (!context || !recipe) return (
     <div className="p-4">
@@ -46,7 +50,8 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
     </div>
   );
 
-  const { navigate, lists, addRecipeToList, deleteRecipe } = context;
+  const { navigate, lists, addRecipeToList, deleteRecipe, users } = context;
+  const isOwner = user?.uid === recipe.ownerId;
 
   const handleAddToList = () => {
     if (selectedListId) {
@@ -63,6 +68,8 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
   const handleDelete = () => {
     deleteRecipe(recipe.id);
   }
+  
+  const collaborators = recipe.collaborators.map(uid => users.find(u => u.uid === uid)).filter(Boolean);
 
   return (
     <div>
@@ -85,28 +92,35 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
             <h1 className="text-4xl font-headline font-bold">{recipe.icon} {recipe.name}</h1>
         </div>
          <div className="absolute top-2 right-2 flex gap-2">
-            <Button variant="ghost" size="icon" className="bg-background/50 rounded-full" onClick={handleEdit}>
-                <Pencil className="h-5 w-5"/>
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="icon" className="bg-background/50 rounded-full">
-                    <Trash2 className="h-5 w-5"/>
+            {isOwner && (
+              <>
+                <Button variant="ghost" size="icon" className="bg-background/50 rounded-full" onClick={() => setShareModalOpen(true)}>
+                    <Share2 className="h-5 w-5"/>
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the recipe for "{recipe.name}".
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                <Button variant="ghost" size="icon" className="bg-background/50 rounded-full" onClick={handleEdit}>
+                    <Pencil className="h-5 w-5"/>
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="icon" className="bg-background/50 rounded-full">
+                        <Trash2 className="h-5 w-5"/>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the recipe for "{recipe.name}".
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
         </div>
       </div>
 
@@ -147,6 +161,14 @@ const RecipeDetailView = ({ recipeId }: RecipeDetailViewProps) => {
             </ul>
         </div>
       </div>
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        entityType="recipe"
+        entityId={recipe.id}
+        ownerId={recipe.ownerId}
+        collaborators={collaborators}
+      />
     </div>
   );
 };
