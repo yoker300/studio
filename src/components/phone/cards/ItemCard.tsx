@@ -28,7 +28,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
       className={cn(
         'transition-all duration-300',
         item.checked ? 'bg-muted/50 opacity-60' : 'bg-card',
-        item.urgent && !item.checked && 'border-primary'
+        item.urgent && !item.checked && 'border-destructive'
       )}
     >
       <CardContent className="p-3 flex items-start gap-3">
@@ -46,7 +46,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
               className={cn(
                 'font-medium',
                 item.checked && 'line-through',
-                item.urgent && !item.checked && 'text-primary font-bold'
+                item.urgent && !item.checked && 'text-destructive font-bold'
               )}
             >
               {item.name}

@@ -29,7 +29,7 @@ const WatchItem = ({ item, listId }: WatchItemProps) => {
     >
       <span className="text-2xl">{item.icon}</span>
       <div className="flex-1">
-        <span className={cn('text-lg', item.checked && 'line-through')}>{item.name}</span>
+        <span className={cn('text-lg', item.checked && 'line-through', item.urgent && !item.checked && 'text-destructive')}>{item.name}</span>
       </div>
       <div className="flex items-center gap-1">
         {item.gf && <WheatOff className="h-4 w-4 text-green-400" />}
