@@ -25,6 +25,10 @@ const ListCard = ({ list }: ListCardProps) => {
   const owner = users.find(u => u.uid === list.ownerId);
   const isOwner = user?.uid === list.ownerId;
 
+  const collaboratorProfiles = list.collaborators
+    .map(uid => users.find(u => u.uid === uid))
+    .filter((c): c is UserProfile => !!c && c.uid !== list.ownerId);
+
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate({ type: 'listDetail', listId: list.id })}>
       <CardHeader className="flex flex-row items-start justify-between pb-2">
@@ -40,17 +44,12 @@ const ListCard = ({ list }: ListCardProps) => {
                 <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
               </Avatar>
             )}
-            {list.collaborators.map(uid => {
-              if (uid === list.ownerId) return null; // Don't show owner's avatar twice
-              const collaborator = users.find(u => u.uid === uid);
-              if (!collaborator) return null;
-              return (
-                <Avatar key={uid} className="h-6 w-6 border-2 border-background">
-                  <AvatarImage src={collaborator.photoURL} alt={collaborator.name} />
-                  <AvatarFallback>{collaborator.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-              );
-            })}
+            {collaboratorProfiles.map(collaborator => (
+              <Avatar key={collaborator.uid} className="h-6 w-6 border-2 border-background">
+                <AvatarImage src={collaborator.photoURL} alt={collaborator.name} />
+                <AvatarFallback>{collaborator.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+            ))}
           </div>
         </div>
         {isOwner && (
