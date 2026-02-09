@@ -9,7 +9,8 @@ service cloud.firestore {
     // Rules for user profiles.
     match /users/{userId} {
       // Allow any signed-in user to read profiles for collaborator search.
-      allow get, list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       
       // A user can only create or update their own profile.
       allow create, update: if isSignedIn() && request.auth.uid == userId;
