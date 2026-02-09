@@ -4,7 +4,7 @@ import { createContext, useState, useEffect, ReactNode, useCallback, useMemo } f
 import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, useUser, useFirestore, useMemoFirebase, useCollection, useDoc } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
@@ -338,7 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addRecipe = (recipe: Omit<Recipe, 'id'>) => {
     if (!user) return;
     vibrate();
-    const newRecipe = { ...recipe, ownerId: user.uid, collaborators: [user.uid] };
+    const newRecipe = { ...recipe, ownerId: user.uid, collaborators: [] };
     addDocumentNonBlocking(collection(firestore, 'recipes'), newRecipe).then(docRef => {
       if(docRef) navigate({ type: 'recipeDetail', recipeId: docRef.id });
     });

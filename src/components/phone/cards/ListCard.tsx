@@ -23,9 +23,6 @@ const ListCard = ({ list }: ListCardProps) => {
   const checkedItems = list.items.filter(item => item.checked).length;
   
   const owner = users.find(u => u.uid === list.ownerId);
-  const collaborators = list.collaborators
-    .map(uid => users.find(u => u.uid === uid))
-    .filter((c): c is UserProfile => !!c && c.uid !== list.ownerId);
   const isOwner = user?.uid === list.ownerId;
 
   return (
@@ -37,16 +34,23 @@ const ListCard = ({ list }: ListCardProps) => {
             {list.name}
           </CardTitle>
           <div className="flex items-center gap-2 mt-2">
-            {owner && <Avatar className="h-6 w-6">
-              <AvatarImage src={owner.photoURL} alt={owner.name} />
-              <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
-            </Avatar>}
-            {collaborators.map(c => (
-              <Avatar key={c.uid} className="h-6 w-6 border-2 border-background">
-                <AvatarImage src={c.photoURL} alt={c.name} />
-                <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+            {owner && (
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={owner.photoURL} alt={owner.name} />
+                <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
               </Avatar>
-            ))}
+            )}
+            {list.collaborators.map(uid => {
+              if (uid === list.ownerId) return null; // Don't show owner's avatar twice
+              const collaborator = users.find(u => u.uid === uid);
+              if (!collaborator) return null;
+              return (
+                <Avatar key={uid} className="h-6 w-6 border-2 border-background">
+                  <AvatarImage src={collaborator.photoURL} alt={collaborator.name} />
+                  <AvatarFallback>{collaborator.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+              );
+            })}
           </div>
         </div>
         {isOwner && (

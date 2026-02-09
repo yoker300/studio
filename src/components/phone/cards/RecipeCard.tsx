@@ -1,7 +1,7 @@
 'use client';
 
 import { useContext } from 'react';
-import { Recipe, UserProfile } from '@/lib/types';
+import { Recipe } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import { AppContext } from '@/context/AppContext';
@@ -18,9 +18,6 @@ const RecipeCard = ({ recipe }: RecipeCardProps) => {
   const { navigate, users } = context;
   
   const owner = users.find(u => u.uid === recipe.ownerId);
-  const collaborators = recipe.collaborators
-    .map(uid => users.find(u => u.uid === uid))
-    .filter((c): c is UserProfile => !!c && c.uid !== recipe.ownerId);
 
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer overflow-hidden" onClick={() => navigate({ type: 'recipeDetail', recipeId: recipe.id })}>
@@ -34,16 +31,23 @@ const RecipeCard = ({ recipe }: RecipeCardProps) => {
             data-ai-hint="food recipe"
         />
         <div className="absolute bottom-2 right-2 flex items-center gap-1">
-          {owner && <Avatar className="h-6 w-6">
-            <AvatarImage src={owner.photoURL} alt={owner.name} />
-            <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
-          </Avatar>}
-          {collaborators.map(c => (
-            <Avatar key={c.uid} className="h-6 w-6 border-2 border-background">
-              <AvatarImage src={c.photoURL} alt={c.name} />
-              <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+          {owner && (
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={owner.photoURL} alt={owner.name} />
+              <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
             </Avatar>
-          ))}
+          )}
+          {recipe.collaborators.map(uid => {
+            if (uid === recipe.ownerId) return null;
+            const collaborator = users.find(u => u.uid === uid);
+            if (!collaborator) return null;
+            return (
+              <Avatar key={uid} className="h-6 w-6 border-2 border-background">
+                <AvatarImage src={collaborator.photoURL} alt={collaborator.name} />
+                <AvatarFallback>{collaborator.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+            );
+          })}
         </div>
       </CardHeader>
       <CardContent className="p-4">
