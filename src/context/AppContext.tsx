@@ -4,7 +4,7 @@ import { createContext, useState, useEffect, ReactNode, useCallback, useMemo } f
 import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
@@ -377,31 +377,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
   
   const addCollaborator = async (entityType: 'list' | 'recipe', entityId: string, email: string): Promise<boolean> => {
-    // This is insecure. A real app would use a server-side function to look up users.
-    // For this prototype, we'll fetch all users and filter, but this is NOT for production.
     const usersCollection = collection(firestore, 'users');
     const q = query(usersCollection, where("email", "==", email));
-    const querySnapshot = await getDocs(q);
+    
+    try {
+      const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty) {
-        toast({ variant: 'destructive', title: 'User not found' });
-        return false;
+      if (querySnapshot.empty) {
+          toast({ variant: 'destructive', title: 'User not found' });
+          return false;
+      }
+      
+      const targetUser = querySnapshot.docs[0].data() as UserProfile;
+      const entityCollection = entityType === 'list' ? 'lists' : 'recipes';
+      const entity = entityType === 'list' ? lists.find(e => e.id === entityId) : recipes.find(e => e.id === entityId);
+      
+      if (entity && entity.ownerId !== targetUser.uid && !entity.collaborators.includes(targetUser.uid)) {
+        const updatedCollaborators = [...entity.collaborators, targetUser.uid];
+        updateDocumentNonBlocking(doc(firestore, entityCollection, entityId), { collaborators: updatedCollaborators });
+        toast({ title: 'Collaborator Added' });
+        // Manually add user to local state to trigger UI update
+        setUsers(prev => [...prev, targetUser]);
+        return true;
+      } else {
+         toast({ variant: 'destructive', title: 'Cannot add owner or user is already a collaborator.' });
+      }
+
+    } catch (error) {
+      console.error(error); // Keep this for logging
+      
+      const contextualError = new FirestorePermissionError({
+        path: 'users', // path of the collection being queried
+        operation: 'list'
+      });
+      errorEmitter.emit('permission-error', contextualError);
+      
+      toast({ variant: 'destructive', title: 'Permissions Error', description: 'Could not search for user.' });
+      return false;
     }
     
-    const targetUser = querySnapshot.docs[0].data() as UserProfile;
-    const entityCollection = entityType === 'list' ? 'lists' : 'recipes';
-    const entity = entityType === 'list' ? lists.find(e => e.id === entityId) : recipes.find(e => e.id === entityId);
-    
-    if (entity && !entity.collaborators.includes(targetUser.uid)) {
-      const updatedCollaborators = [...entity.collaborators, targetUser.uid];
-      updateDocumentNonBlocking(doc(firestore, entityCollection, entityId), { collaborators: updatedCollaborators });
-      toast({ title: 'Collaborator Added' });
-      // Manually add user to local state to trigger UI update
-      setUsers(prev => [...prev, targetUser]);
-      return true;
-    } else {
-       toast({ variant: 'destructive', title: 'Collaborator already added or entity not found' });
-    }
     return false;
   };
   
