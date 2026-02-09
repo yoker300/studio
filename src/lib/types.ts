@@ -47,8 +47,6 @@ export type SmartQuantity = {
 export type Settings = {
   darkMode: boolean;
   textSize: 'normal' | 'large';
-  username: string;
-  email: string;
   smartQuantities: SmartQuantity[];
   storePresets: string[];
 };

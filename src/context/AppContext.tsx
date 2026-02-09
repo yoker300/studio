@@ -12,8 +12,6 @@ import { collection, doc, writeBatch, getDocs, query, where } from 'firebase/fir
 const DEFAULT_SETTINGS: Settings = {
   darkMode: true,
   textSize: 'normal',
-  username: 'Smart Shopper',
-  email: 'user@example.com',
   smartQuantities: [
     { itemName: 'Eggs', quantities: [6, 12, 18] },
     { itemName: 'Water', quantities: [6, 12, 24] },

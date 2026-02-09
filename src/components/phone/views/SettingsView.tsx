@@ -14,8 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useUser, useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const SettingsView = () => {
   const context = useContext(AppContext);
@@ -24,6 +27,9 @@ const SettingsView = () => {
   
   const [newSQItemName, setNewSQItemName] = useState('');
   const [newSQQuantities, setNewSQQuantities] = useState('');
+
+  const { user } = useUser();
+  const auth = useAuth();
 
 
   if (!context) return null;
@@ -40,8 +46,9 @@ const SettingsView = () => {
     updateSettings({ storePresets: settings.storePresets.filter(s => s !== storeToRemove) });
   };
   
-  const handleProfileSave = () => {
-    toast({ title: 'Profile Saved!', description: 'Your profile details have been updated.' });
+  const handleSignOut = () => {
+    signOut(auth);
+    toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
   }
 
   const handleSQAdd = () => {
@@ -72,22 +79,29 @@ const SettingsView = () => {
       </header>
       
       {/* Profile Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="username">Username</Label>
-            <Input id="username" value={settings.username} onChange={e => updateSettings({ username: e.target.value })} />
-          </div>
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={settings.email} onChange={e => updateSettings({ email: e.target.value })} />
-          </div>
-          <Button onClick={handleProfileSave}>Save Profile</Button>
-        </CardContent>
-      </Card>
+      {user && (
+        <Card>
+          <CardHeader>
+            <CardTitle>My Profile</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'user'} />
+                <AvatarFallback>{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-xl font-bold">{user.displayName}</p>
+                <p className="text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Presets Card */}
       <Card>
