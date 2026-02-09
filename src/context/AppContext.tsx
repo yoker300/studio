@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: Settings = {
     { itemName: 'Eggs', quantities: [6, 12, 18] },
     { itemName: 'Water', quantities: [6, 12, 24] },
   ],
-  storePresets: ['שופרסל', 'יוחננוף', 'רמי לוי', 'אושר עד'],
+  storePresets: ['שופרסל', 'חצי חינם', 'רמי לוי', 'אושר עד'],
 };
 
 type AppContextType = {
