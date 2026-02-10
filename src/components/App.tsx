@@ -8,6 +8,7 @@ import WatchExperience from '@/components/watch/WatchExperience';
 import { Skeleton } from './ui/skeleton';
 import { useUser } from '@/firebase';
 import LoginView from './phone/views/LoginView';
+import Image from 'next/image';
 
 export default function App() {
   const isWatch = useIsWatch();
@@ -24,14 +25,18 @@ export default function App() {
 
   if (isUserLoading || context?.isDataLoading) {
     return (
-      <div className="w-screen h-screen p-4">
-        <div className="flex flex-col space-y-3">
-          <Skeleton className="h-[125px] w-full rounded-xl" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-4/5" />
-          </div>
-        </div>
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-background p-4">
+        <Image
+          src="https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1080"
+          alt="SmartList Loading"
+          width={200}
+          height={200}
+          className="rounded-3xl shadow-2xl animate-pulse"
+          priority
+          data-ai-hint="groceries fresh"
+        />
+        <h1 className="text-4xl font-headline font-bold mt-6">SmartList</h1>
+        <p className="text-muted-foreground mt-2">Loading your lists...</p>
       </div>
     );
   }
@@ -42,14 +47,18 @@ export default function App() {
 
   if (isWatch === undefined || !context) {
     return (
-      <div className="w-screen h-screen p-4">
-        <div className="flex flex-col space-y-3">
-          <Skeleton className="h-[125px] w-full rounded-xl" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-4/5" />
-          </div>
-        </div>
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-background p-4">
+        <Image
+          src="https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1080"
+          alt="SmartList Loading"
+          width={200}
+          height={200}
+          className="rounded-3xl shadow-2xl animate-pulse"
+          priority
+          data-ai-hint="groceries fresh"
+        />
+        <h1 className="text-4xl font-headline font-bold mt-6">SmartList</h1>
+        <p className="text-muted-foreground mt-2">Loading your lists...</p>
       </div>
     );
   }
