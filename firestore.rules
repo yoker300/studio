@@ -38,8 +38,11 @@ service cloud.firestore {
       // A user can create a list if they are authenticated and set themselves as the owner.
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       
-      // Only the owner of a list can update or delete it.
-      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      // Only the owner or a collaborator can update a list.
+      allow update: if isSignedIn() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.collaborators);
+      
+      // Only the owner of a list can delete it.
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
     // Rules for the root 'recipes' collection.
@@ -54,8 +57,11 @@ service cloud.firestore {
       // A user can create a recipe if they are authenticated and set themselves as the owner.
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
 
-      // Only the owner of a recipe can update or delete it.
-      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      // Only the owner or a collaborator can update a recipe.
+      allow update: if isSignedIn() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.collaborators);
+
+      // Only the owner of a recipe can delete it.
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
   }
 }
