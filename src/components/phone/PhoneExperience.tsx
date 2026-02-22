@@ -13,6 +13,8 @@ import EditListView from './views/EditListView';
 import EditRecipeView from './views/EditRecipeView';
 import GenerateRecipeView from './views/GenerateRecipeView';
 import { MergeConfirmationModal } from './modals/MergeConfirmationModal';
+import GenerateRecipeFromImageView from './views/GenerateRecipeFromImageView';
+import GenerateRecipeFromUrlView from './views/GenerateRecipeFromUrlView';
 
 const PhoneExperience = () => {
   const context = useContext(AppContext);
@@ -39,6 +41,10 @@ const PhoneExperience = () => {
         return <EditListView listId={currentView.listId} />;
       case 'addRecipe':
         return <GenerateRecipeView />;
+      case 'addRecipeFromImage':
+        return <GenerateRecipeFromImageView />;
+      case 'addRecipeFromUrl':
+        return <GenerateRecipeFromUrlView />;
       case 'editRecipe':
         return <EditRecipeView recipeId={currentView.recipeId} />;
       default:

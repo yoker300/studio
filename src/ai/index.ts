@@ -6,3 +6,5 @@ import './flows/ai-process-item';
 import './flows/ai-break-down-recipe';
 import './flows/ai-generate-recipe';
 import './ai-smart-add-item';
+import './flows/ai-generate-recipe-from-image';
+import './flows/ai-generate-recipe-from-url';

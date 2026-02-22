@@ -5,7 +5,7 @@ import { AppContext } from '@/context/AppContext';
 import RecipeCard from '../cards/RecipeCard';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Sparkles, Pencil } from 'lucide-react';
+import { Plus, Sparkles, Pencil, Image as ImageIcon, Link } from 'lucide-react';
 
 const RecipesView = () => {
   const context = useContext(AppContext);
@@ -35,6 +35,14 @@ const RecipesView = () => {
             <DropdownMenuItem onClick={handleCreateRecipe}>
               <Sparkles className="mr-2 h-4 w-4" />
               Generate with AI
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate({ type: 'addRecipeFromImage' })}>
+              <ImageIcon className="mr-2 h-4 w-4" />
+              From Picture
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate({ type: 'addRecipeFromUrl' })}>
+              <Link className="mr-2 h-4 w-4" />
+              From URL
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleManualCreate}>
               <Pencil className="mr-2 h-4 w-4" />

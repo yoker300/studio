@@ -61,6 +61,8 @@ export type View =
   | { type: 'addList' }
   | { type: 'editList'; listId: string }
   | { type: 'addRecipe' }
+  | { type: 'addRecipeFromImage' }
+  | { type: 'addRecipeFromUrl' }
   | { type: 'editRecipe'; recipeId?: string };
 
 
@@ -104,6 +106,13 @@ export type GenerateRecipeOutput = {
         notes?: string;
         icon?: string;
     }[];
+};
+
+export type GenerateRecipeFromImageInput = {
+  imageDataUri: string;
+};
+export type GenerateRecipeFromUrlInput = {
+  url: string;
 };
 
 export type ProcessItemInput = {
