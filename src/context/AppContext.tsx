@@ -1,13 +1,12 @@
 'use client';
 
 import { createContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile, Invite } from '@/lib/types';
+import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc, query, where, getDocs, writeBatch, arrayUnion, getDoc } from 'firebase/firestore';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { collection, doc, query, where, getDocs, writeBatch, arrayUnion, getDoc, Firestore } from 'firebase/firestore';
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
@@ -18,6 +17,20 @@ const DEFAULT_SETTINGS: Settings = {
   ],
   storePresets: ['שופרסל', 'חצי חינם', 'רמי לוי', 'אושר עד'],
 };
+
+// --- Local Helper Functions for DB operations ---
+
+const _commitItemToList = (firestore: Firestore, listId: string, list: List, itemData: Omit<Item, 'id' | 'checked'>) => {
+    const newItem: Item = { ...itemData, id: uuidv4(), checked: false, notes: (itemData.notes || '').trim(), store: (itemData.store || '').trim() };
+    const updatedItems = [...list.items, newItem];
+    updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
+};
+
+const _performMerge = (firestore: Firestore, listId: string, list: List, existingItem: Item, newItemData: Omit<Item, 'id' | 'checked'>) => {
+    const updatedItems = list.items.map(i => i.id === existingItem.id ? { ...i, name: existingItem.name, qty: i.qty + newItemData.qty, urgent: i.urgent || newItemData.urgent, store: (existingItem.store || newItemData.store || '').trim() } : i);
+    updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
+};
+
 
 type AppContextType = {
   lists: List[];
@@ -50,8 +63,7 @@ type AppContextType = {
   clearGeneratedRecipe: () => void;
   confirmMerge: () => void;
   declineMerge: (keepSeparate?: boolean) => void;
-  createInvite: (entityType: 'list' | 'recipe', entityId: string) => Promise<string | null>;
-  acceptInvite: (inviteId: string) => Promise<void>;
+  addCollaborator: (entityType: 'list' | 'recipe', entityId: string, email: string) => Promise<boolean>;
   removeCollaborator: (entityType: 'list' | 'recipe', entityId: string, userId: string) => void;
 };
 
@@ -61,8 +73,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [currentView, setCurrentView] = useState<View>({ type: 'lists' });
@@ -86,6 +96,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { data: ownedRecipes, isLoading: loadingOwnedRecipes } = useCollection<Recipe>(userOwnedRecipesQuery);
   const { data: collaboratingRecipes, isLoading: loadingCollabRecipes } = useCollection<Recipe>(userCollaboratingRecipesQuery);
   
+  const isDataLoading = loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes || isUserLoading || loadingSettings;
+  
   const lists = useMemo(() => {
     const allLists = new Map<string, List>();
     (ownedLists || []).forEach(list => allLists.set(list.id, list));
@@ -100,11 +112,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return Array.from(allRecipes.values());
   }, [ownedRecipes, collaboratingRecipes]);
   
-  const isDataLoading = loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes || isUserLoading || loadingSettings;
-
   // Fetch profiles for all collaborators across all lists and recipes
   useEffect(() => {
-    if (!user || isUserLoading || loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes) return;
+    if (!user || isDataLoading) return;
     const allUserIds = new Set<string>();
 
     lists.forEach(list => {
@@ -127,7 +137,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     const fetchUsers = async () => {
       const usersRef = collection(firestore, 'users');
-      // Firestore 'in' query is limited to 30 items. We need to batch.
       const userChunks: UserProfile[] = [];
       for (let i = 0; i < ids.length; i += 30) {
           const chunk = ids.slice(i, i + 30);
@@ -141,31 +150,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     fetchUsers().catch(console.error);
-  }, [lists, recipes, firestore, user, isUserLoading, loadingOwnedLists, loadingCollabLists, loadingOwnedRecipes, loadingCollabRecipes]);
+  }, [lists, recipes, firestore, user, isDataLoading]);
 
-  // Effect to handle invite links from URL
-  useEffect(() => {
-    const inviteId = searchParams.get('invite');
-    if (inviteId && user) {
-      acceptInvite(inviteId);
-      // Remove the query param from URL to avoid re-triggering
-      router.replace(window.location.pathname);
-    }
-  }, [searchParams, user]); // Rerun when user logs in
-  
   // Effect to manage settings state from Firestore
   useEffect(() => {
     if (user) {
       if (settingsData === null && !loadingSettings) {
-        // No settings doc exists, create one with defaults
         setDocumentNonBlocking(settingsRef!, DEFAULT_SETTINGS, { merge: true });
         setSettings(DEFAULT_SETTINGS);
       } else if (settingsData) {
-        // Settings doc exists, merge with defaults to ensure all keys are present
         setSettings(prev => ({ ...DEFAULT_SETTINGS, ...settingsData }));
       }
     } else {
-        // No user, reset to default
         setSettings(DEFAULT_SETTINGS);
     }
   }, [settingsData, loadingSettings, user, settingsRef]);
@@ -222,7 +218,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     } catch (e) {
       console.error("AI item processing failed:", e);
-      // Fallback to a non-processed item
       toast({
         variant: 'destructive',
         title: 'AI Processing Failed',
@@ -232,83 +227,102 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
   
-  const _commitItemToList = (listId: string, itemData: Omit<Item, 'id' | 'checked'>) => {
-    const list = lists.find(l => l.id === listId);
-    if (!list) return;
-    const newItem: Item = { ...itemData, id: uuidv4(), checked: false, notes: (itemData.notes || '').trim(), store: (itemData.store || '').trim() };
-    const updatedItems = [...list.items, newItem];
-    updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
-  };
+  // Effect to process the item queue in a controlled loop
+  useEffect(() => {
+    if (pendingItemsQueue.length === 0 || mergeProposal || isDataLoading || !firestore) {
+      return;
+    }
 
-  const _performMerge = (listId: string, existingItem: Item, newItemData: Omit<Item, 'id' | 'checked'>) => {
-    const list = lists.find(l => l.id === listId);
-    if (!list) return;
-    const updatedItems = list.items.map(i => i.id === existingItem.id ? { ...i, name: existingItem.name, qty: i.qty + newItemData.qty, urgent: i.urgent || newItemData.urgent, store: (existingItem.store || newItemData.store || '').trim() } : i);
-    updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
-  };
+    let isMounted = true;
 
-  const processItemsQueue = useCallback(async () => {
-    if (mergeProposal || pendingItemsQueue.length === 0) return;
+    const processNextItem = async () => {
+      const [currentItem, ...restOfQueue] = pendingItemsQueue;
 
-    const [currentItem, ...restOfQueue] = pendingItemsQueue;
-    setPendingItemsQueue(restOfQueue);
-    
-    const { listId, skipProcessing, ...itemData } = currentItem;
+      try {
+        const { listId, skipProcessing, ...itemData } = currentItem;
 
-    const newItemData = skipProcessing ? { ...itemData, name: itemData.name, canonicalName: itemData.canonicalName || itemData.name, category: itemData.category || 'Other', icon: itemData.icon || '🛒' } : await runItemProcessing(itemData);
-    
-    // Need to get the most up-to-date list from state
-    const getFreshList = (listId: string): List | undefined => {
-        return lists.find(l => l.id === listId);
+        const newItemData = skipProcessing 
+          ? { ...itemData, name: itemData.name, canonicalName: itemData.canonicalName || itemData.name, category: itemData.category || 'Other', icon: itemData.icon || '🛒' } 
+          : await runItemProcessing(itemData);
+
+        const listRef = doc(firestore, 'lists', listId);
+        const listSnap = await getDoc(listRef);
+
+        if (!listSnap.exists()) {
+          console.warn("List not found for item processing, requeueing...");
+          if(isMounted) setPendingItemsQueue([...restOfQueue, currentItem]); // Move to back of queue
+          return;
+        }
+
+        const list = { ...listSnap.data(), id: listSnap.id } as List;
+        const newItemNotes = (newItemData.notes || '').trim();
+        const newItemStore = (newItemData.store || '').trim();
+
+        const perfectMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName && i.unit === newItemData.unit && (i.notes || '').trim() === newItemNotes && (i.store || '').trim() === newItemStore);
+        if (perfectMatch) {
+          _performMerge(firestore, listId, list, perfectMatch, newItemData);
+          if(isMounted) setPendingItemsQueue(restOfQueue);
+          return;
+        }
+
+        const storeProposalMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName && i.unit === newItemData.unit && (i.notes || '').trim() === newItemNotes && ((!!(i.store || '').trim() && !newItemStore) || (!((i.store || '').trim()) && !!newItemStore)));
+        if (storeProposalMatch) {
+          if(isMounted) {
+            setMergeProposal({ existingItem: storeProposalMatch, newItemData: newItemData, listId: listId });
+            // Keep item at front of queue, pause processing
+          }
+          return;
+        }
+        
+        _commitItemToList(firestore, listId, list, newItemData);
+        if(isMounted) setPendingItemsQueue(restOfQueue);
+
+      } catch (error) {
+        console.error("Error processing item queue:", error);
+        if(isMounted) setPendingItemsQueue(restOfQueue);
+      }
     };
     
-    const list = getFreshList(listId);
-    if (!list) {
-        console.warn("List not found during item processing, requeueing...");
-        setPendingItemsQueue(prev => [currentItem, ...prev]);
-        return;
+    processNextItem();
+
+    return () => {
+      isMounted = false;
     }
 
-    const newItemNotes = (newItemData.notes || '').trim();
-    const newItemStore = (newItemData.store || '').trim();
+  }, [pendingItemsQueue, mergeProposal, isDataLoading, firestore, toast]);
 
-    const perfectMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName && i.unit === newItemData.unit && (i.notes || '').trim() === newItemNotes && (i.store || '').trim() === newItemStore);
-    if (perfectMatch) {
-        _performMerge(listId, perfectMatch, newItemData);
-        if (restOfQueue.length > 0) processItemsQueue();
-        return;
-    }
+  const confirmMerge = async () => {
+    if (!mergeProposal || !firestore) return;
+    const { listId, existingItem, newItemData } = mergeProposal;
 
-    const storeProposalMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName && i.unit === newItemData.unit && (i.notes || '').trim() === newItemNotes && ((!!(i.store || '').trim() && !newItemStore) || (!((i.store || '').trim()) && !!newItemStore)));
-    if (storeProposalMatch) {
-        setMergeProposal({ existingItem: storeProposalMatch, newItemData: newItemData, listId: listId });
-        return; // Stop processing and wait for user
+    const listRef = doc(firestore, 'lists', listId);
+    const listSnap = await getDoc(listRef);
+
+    if (listSnap.exists()) {
+      const list = { ...listSnap.data(), id: listSnap.id } as List;
+      _performMerge(firestore, listId, list, existingItem, newItemData);
     }
     
-    _commitItemToList(listId, newItemData);
-    if (restOfQueue.length > 0) processItemsQueue();
-
-  }, [pendingItemsQueue, mergeProposal, lists, toast]);
-
-
-  useEffect(() => {
-    if (pendingItemsQueue.length > 0 && !mergeProposal && !isDataLoading) {
-        const timeoutId = setTimeout(processItemsQueue, 100);
-        return () => clearTimeout(timeoutId);
-    }
-  }, [pendingItemsQueue, mergeProposal, isDataLoading, processItemsQueue]);
-
-  const confirmMerge = () => {
-    if (!mergeProposal) return;
-    const { listId, existingItem, newItemData } = mergeProposal;
-    _performMerge(listId, existingItem, newItemData);
+    const [_, ...restOfQueue] = pendingItemsQueue;
+    setPendingItemsQueue(restOfQueue);
     setMergeProposal(null);
   };
 
-  const declineMerge = (keepSeparate = true) => {
-      if (!mergeProposal) return;
+  const declineMerge = async (keepSeparate = true) => {
+      if (!mergeProposal || !firestore) return;
       const { listId, newItemData } = mergeProposal;
-      if (keepSeparate) _commitItemToList(listId, newItemData);
+      
+      if (keepSeparate) {
+        const listRef = doc(firestore, 'lists', listId);
+        const listSnap = await getDoc(listRef);
+        if (listSnap.exists()) {
+          const list = { ...listSnap.data(), id: listSnap.id } as List;
+          _commitItemToList(firestore, listId, list, newItemData);
+        }
+      }
+      
+      const [_, ...restOfQueue] = pendingItemsQueue;
+      setPendingItemsQueue(restOfQueue);
       setMergeProposal(null);
   };
   
@@ -391,71 +405,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDocumentNonBlocking(settingsRef, updatedState, { merge: true });
   };
   
-  const createInvite = async (entityType: 'list' | 'recipe', entityId: string): Promise<string | null> => {
-    if (!user) return null;
+  const addCollaborator = async (entityType: 'list' | 'recipe', entityId: string, email: string): Promise<boolean> => {
+    if (!email) return false;
+    
+    const usersRef = collection(firestore, 'users');
+    const q = query(usersRef, where("email", "==", email));
+    
     try {
-      const newInviteRef = doc(collection(firestore, 'invites'));
-      const inviteData: Invite = {
-        id: newInviteRef.id,
-        entityType,
-        entityId,
-        ownerId: user.uid,
-        createdAt: new Date(),
-        used: false,
-      };
-      await setDocumentNonBlocking(newInviteRef, inviteData, {});
-      toast({ title: 'Invite Link Created', description: 'Share the link with your friend.' });
-      return `${window.location.origin}?invite=${newInviteRef.id}`;
-    } catch (e) {
-      console.error("Error creating invite:", e);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not create invite link.' });
-      return null;
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        toast({ variant: 'destructive', title: 'User Not Found', description: 'No user found with that email address.' });
+        return false;
+      }
+      
+      const collaborator = querySnapshot.docs[0].data() as UserProfile;
+      const entityCollection = entityType === 'list' ? 'lists' : 'recipes';
+      
+      await updateDocumentNonBlocking(doc(firestore, entityCollection, entityId), {
+        collaborators: arrayUnion(collaborator.uid)
+      });
+      
+      toast({ title: 'Collaborator Added', description: `${collaborator.name} can now access this ${entityType}.` });
+      return true;
+
+    } catch (error) {
+        console.error("Error adding collaborator: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not add collaborator.' });
+        return false;
     }
   };
 
-  const acceptInvite = async (inviteId: string) => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Please Sign In', description: 'You must be signed in to accept an invite.' });
-      return;
-    }
-  
-    const inviteRef = doc(firestore, 'invites', inviteId);
-    const inviteSnap = await getDoc(inviteRef);
-  
-    if (!inviteSnap.exists() || inviteSnap.data().used) {
-      toast({ variant: 'destructive', title: 'Invalid Invite', description: 'This invite link is invalid or has already been used.' });
-      return;
-    }
-  
-    const invite = inviteSnap.data() as Invite;
-    const entityCollection = invite.entityType === 'list' ? 'lists' : 'recipes';
-    const entityRef = doc(firestore, entityCollection, invite.entityId);
-  
-    try {
-      await updateDocumentNonBlocking(entityRef, {
-        collaborators: arrayUnion(user.uid)
-      });
-  
-      await updateDocumentNonBlocking(inviteRef, { used: true });
-  
-      toast({ title: 'Invitation Accepted!', description: `You can now collaborate on this ${invite.entityType}.` });
-  
-      if (invite.entityType === 'list') {
-        navigate({ type: 'listDetail', listId: invite.entityId });
-      } else {
-        navigate({ type: 'recipeDetail', recipeId: invite.entityId });
-      }
-    } catch (error) {
-      console.error('Error accepting invite:', error);
-      const contextualError = new FirestorePermissionError({
-        path: entityRef.path,
-        operation: 'update',
-        requestResourceData: { collaborators: arrayUnion(user.uid) },
-      });
-      errorEmitter.emit('permission-error', contextualError);
-    }
-  };
-  
   const removeCollaborator = (entityType: 'list' | 'recipe', entityId: string, userId: string) => {
     const entityCollection = entityType === 'list' ? 'lists' : 'recipes';
     const entity = entityType === 'list' ? lists.find(e => e.id === entityId) : recipes.find(e => e.id === entityId);
@@ -471,7 +450,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lists, recipes, settings, isDataLoading, currentView, activeTab, urgentMode, generatedRecipe, mergeProposal, users,
     navigate, vibrate, addList, updateList, deleteList, addItemToList, addSmartItemToList, updateItemInList, deleteItemInList,
     toggleItemChecked, setUrgentMode, addRecipe, updateRecipe, deleteRecipe, addRecipeToList, updateSettings, setGeneratedRecipe,
-    clearGeneratedRecipe, confirmMerge, declineMerge, createInvite, acceptInvite, removeCollaborator
+    clearGeneratedRecipe, confirmMerge, declineMerge, addCollaborator, removeCollaborator
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
