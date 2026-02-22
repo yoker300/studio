@@ -30,7 +30,7 @@ const ListCard = ({ list }: ListCardProps) => {
     .filter((c): c is UserProfile => !!c && c.uid !== list.ownerId);
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate({ type: 'listDetail', listId: list.id })}>
+    <Card className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate({ type: 'listDetail', listId: list.id })}>
       <CardHeader className="flex flex-row items-start justify-between pb-2">
         <div className="flex-1">
           <CardTitle className="flex items-center gap-3 text-2xl font-headline">
@@ -53,8 +53,8 @@ const ListCard = ({ list }: ListCardProps) => {
           </div>
         </div>
         {isOwner && (
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate({type: 'editList', listId: list.id}); }}>
-            <Pencil className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); navigate({type: 'editList', listId: list.id}); }}>
+            <Pencil className="h-5 w-5 text-muted-foreground" />
           </Button>
         )}
       </CardHeader>
