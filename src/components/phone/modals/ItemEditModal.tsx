@@ -284,7 +284,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
 
           </div>
 
-          <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
+          <DialogFooter className="mt-4 flex justify-between items-center">
             <div>
               {item && (
                 <AlertDialog>
@@ -308,7 +308,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 </AlertDialog>
               )}
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-2">
               <DialogClose asChild>
                 <Button type="button" variant="secondary">Cancel</Button>
               </DialogClose>
