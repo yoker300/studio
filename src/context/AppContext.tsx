@@ -236,16 +236,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     } catch (e) {
       console.error("AI item processing failed:", e);
-      toast({
-        variant: 'destructive',
-        title: 'AI Processing Failed',
-        description: 'The item was added, but AI processing failed.',
-      });
-      return { ...item, name: item.name, canonicalName: item.name, category: item.category || 'Other', icon: item.icon || '🛒' };
+      // Re-throw so the calling function knows about the failure.
+      throw new Error('AI processing failed');
     }
   };
   
-  // Effect to process the item queue in a controlled loop
   useEffect(() => {
     if (pendingItemsQueue.length === 0 || mergeProposal || !firestore) {
       return;
@@ -254,11 +249,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     const processNextItem = async () => {
-      // Dequeue the next item
-      const [currentItem, ...restOfQueue] = pendingItemsQueue;
-      if (!isMounted) return;
-      setPendingItemsQueue(restOfQueue);
-      
+      const currentItem = pendingItemsQueue[0]; // Peek at the item, don't dequeue yet
+      if (!currentItem) return;
+
       try {
         const { listId, skipProcessing, ...itemData } = currentItem;
 
@@ -270,31 +263,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const listSnap = await getDoc(listRef);
 
         if (!listSnap.exists()) {
-          console.warn("List not found for item processing, requeueing...");
-          if(isMounted) setPendingItemsQueue(prev => [currentItem, ...prev]); // Add back to front
+          console.warn(`List ${listId} not found for item processing, removing item from queue.`);
+          toast({ title: 'List Not Found', description: `Could not add "${itemData.name}" because the list no longer exists.`, variant: 'destructive'});
+          if (isMounted) {
+            setPendingItemsQueue(prev => prev.slice(1)); // Dequeue failed item
+          }
           return;
         }
 
         const list = { ...listSnap.data(), id: listSnap.id } as List;
-        
-        // More flexible matching: find any unchecked item with the same canonical name.
         const potentialMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName);
 
         if (potentialMatch) {
-            if(isMounted) {
-                // Found a potential duplicate, so ask the user.
-                setMergeProposal({ existingItem: potentialMatch, newItemData: newItemData, listId: listId });
-                // Re-queue the item at the front. It will be handled by confirm/decline merge.
-                setPendingItemsQueue(prev => [currentItem, ...prev]);
+            if (isMounted) {
+                // Found a duplicate, so ask the user. The item stays in the queue.
+                setMergeProposal({ existingItem: potentialMatch, newItemData, listId });
             }
             return; // Stop processing until user decides
         }
         
-        // No match found, so add it as a new item.
+        // No match, so add it.
         _commitItemToList(firestore, listId, list, newItemData);
+
+        if (isMounted) {
+            setPendingItemsQueue(prev => prev.slice(1)); // Dequeue successfully added item
+        }
 
       } catch (error) {
         console.error("Error processing item queue:", error);
+        toast({ title: 'Processing Error', description: `Could not add "${currentItem.name}".`, variant: 'destructive'});
+        if (isMounted) {
+          setPendingItemsQueue(prev => prev.slice(1)); // Dequeue failed item
+        }
       }
     };
     
@@ -303,7 +303,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     }
-
   }, [pendingItemsQueue, mergeProposal, firestore, toast]);
 
   const confirmMerge = async () => {
@@ -318,10 +317,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       _performMerge(firestore, listId, list, existingItem, newItemData);
     }
     
-    // Item has been dealt with, so remove it from the queue and reset the proposal
-    const [_, ...restOfQueue] = pendingItemsQueue;
-    setPendingItemsQueue(restOfQueue);
-    setMergeProposal(null);
+    setPendingItemsQueue(prev => prev.slice(1)); // Dequeue handled item
+    setMergeProposal(null); // Resume queue processing
   };
 
   const declineMerge = async (keepSeparate = true) => {
@@ -337,10 +334,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // Item has been dealt with, so remove it from the queue and reset the proposal
-      const [_, ...restOfQueue] = pendingItemsQueue;
-      setPendingItemsQueue(restOfQueue);
-      setMergeProposal(null);
+      setPendingItemsQueue(prev => prev.slice(1)); // Dequeue handled item
+      setMergeProposal(null); // Resume queue processing
   };
   
   const addSmartItemToList = (listId: string, itemData: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => {
