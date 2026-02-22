@@ -95,10 +95,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (collaboratingRecipes || []).forEach(recipe => allRecipes.set(recipe.id, recipe));
     return Array.from(allRecipes.values());
   }, [ownedRecipes, collaboratingRecipes]);
+  
+  const isDataLoading = loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes || isUserLoading || loadingSettings;
 
   // Fetch profiles for all collaborators across all lists and recipes
   useEffect(() => {
-    if (!user) return;
+    if (!user || isDataLoading) return;
     const allUserIds = new Set<string>();
 
     lists.forEach(list => {
@@ -135,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     fetchUsers().catch(console.error);
-  }, [lists, recipes, firestore, user]);
+  }, [lists, recipes, firestore, user, isDataLoading]);
 
   
   // Effect to manage settings state from Firestore
@@ -155,8 +157,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [settingsData, loadingSettings, user, settingsRef]);
   
-  const isDataLoading = loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes || isUserLoading || loadingSettings;
-
   const activeTab = currentView.type.includes('list') ? 'lists' : currentView.type.includes('recipe') ? 'recipes' : 'settings';
 
   const vibrate = useCallback(() => {
@@ -311,12 +311,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     vibrate();
     const list = lists.find(l => l.id === listId);
     if (!list) return;
-    
-    const updatedItems = list.items.filter(i => i.id !== updatedItem.id);
+
+    // The previous implementation deleted the item and re-added it via the AI queue.
+    // This is incorrect for an update and causes permission issues for collaborators.
+    // The correct approach is to find the item and update it in place.
+    const updatedItems = list.items.map(item =>
+      item.id === updatedItem.id ? updatedItem : item
+    );
+
+    // Perform a single update operation on the document
     updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
 
-    const { id, checked, ...itemData } = updatedItem;
-    setPendingItemsQueue(prev => [...prev, { ...itemData, listId }]);
+    // Since this is a direct edit, we provide immediate feedback.
+    toast({ title: "Item Updated", description: `"${updatedItem.name}" has been saved.` });
   };
   
   const deleteItemInList = (listId: string, itemId: string) => {

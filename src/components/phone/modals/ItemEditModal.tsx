@@ -139,9 +139,8 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       image: data.image || '',
     };
     
-    if (item) { 
+    if (item) {
       updateItemInList(listId, { ...item, ...itemData });
-      toast({ title: "Item Update Queued", description: `"${data.name}" will be processed.`});
     } else {
       addItemToList(listId, { ...itemData, checked: false });
       toast({ title: "Item Added to Queue", description: `"${data.name}" will be processed.`});
@@ -280,7 +279,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
             </div>
 
             {/* Notes */}
-            <Controller name="notes" control={control} render={({ field }) => <Textarea {...field} placeholder="Notes (e.g., Brand X, low fat)..." rows={2}/>} />
+            <Textarea {...control.register('notes')} placeholder="Notes (e.g., Brand X, low fat)..." rows={2} className="rtl:text-right" />
 
           </div>
 
