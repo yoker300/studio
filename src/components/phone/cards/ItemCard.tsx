@@ -55,7 +55,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
               <Badge variant="secondary">x{item.qty}</Badge>
             )}
              {item.gf && (
-              <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30">
+              <Badge variant="outline">
                 <WheatOff className="h-3 w-3 mr-1" /> GF
               </Badge>
             )}
@@ -64,7 +64,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
              )}
           </div>
           {combinedNotes && (
-            <div className="text-sm text-blue-600 dark:text-blue-400 pl-8">
+            <div className="text-sm text-muted-foreground pl-8">
               <p>{combinedNotes}</p>
             </div>
           )}
