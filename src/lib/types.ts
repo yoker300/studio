@@ -11,6 +11,7 @@ export type Item = {
   notes?: string;
   checked: boolean;
   gf: boolean;
+  image?: string;
 };
 
 export type Recipe = {

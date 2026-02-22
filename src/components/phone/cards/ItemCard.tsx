@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { WheatOff } from 'lucide-react';
+import { WheatOff, Pencil, Camera } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type ItemRowProps = {
   item: Item;
@@ -24,7 +25,6 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
 
   return (
     <Card
-      onClick={onEdit}
       className={cn(
         'transition-all duration-300',
         item.checked ? 'bg-muted/50 opacity-60' : 'bg-card',
@@ -39,7 +39,7 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
           onCheckedChange={() => toggleItemChecked(listId, item.id)}
           className="mt-1 h-6 w-6"
         />
-        <div className="flex-1 grid gap-1" onClick={onEdit}>
+        <div className="flex-1 grid gap-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xl">{item.icon}</span>
             <span
@@ -59,6 +59,9 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
                 <WheatOff className="h-3 w-3 mr-1" /> GF
               </Badge>
             )}
+            {item.image && (
+                <Camera className="h-4 w-4 text-muted-foreground" />
+             )}
           </div>
           {combinedNotes && (
             <div className="text-sm text-blue-600 dark:text-blue-400 pl-8">
@@ -66,6 +69,9 @@ const ItemRow = ({ item, listId, onEdit }: ItemRowProps) => {
             </div>
           )}
         </div>
+        <Button variant="ghost" size="icon" onClick={onEdit}>
+          <Pencil className="h-5 w-5 text-muted-foreground" />
+        </Button>
       </CardContent>
     </Card>
   );

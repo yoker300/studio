@@ -14,12 +14,24 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Minus, Plus, Zap, WheatOff } from 'lucide-react';
+import { Minus, Plus, Zap, WheatOff, Trash2, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 const itemSchema = z.object({
   icon: z.string().min(1, "Icon is required."),
@@ -30,6 +42,7 @@ const itemSchema = z.object({
   notes: z.string().optional(),
   urgent: z.boolean(),
   gf: z.boolean(),
+  image: z.string().optional(),
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
@@ -46,6 +59,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     control,
@@ -64,6 +78,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       notes: '',
       urgent: false,
       gf: false,
+      image: '',
     },
   });
 
@@ -80,6 +95,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           notes: item.notes,
           urgent: item.urgent,
           gf: item.gf,
+          image: item.image,
         });
         setTimeout(() => nameInputRef.current?.focus(), 100);
       } else {
@@ -92,6 +108,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           notes: '',
           urgent: false,
           gf: false,
+          image: '',
         });
       }
     }
@@ -99,12 +116,13 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
 
 
   if (!context) return null;
-  const { addItemToList, updateItemInList, settings } = context;
+  const { addItemToList, updateItemInList, settings, deleteItemInList } = context;
 
   const watchedName = watch('name');
   const watchedQty = watch('qty');
   const watchedUrgent = watch('urgent');
   const watchedGf = watch('gf');
+  const watchedImage = watch('image');
   
   const smartQuantityRule = settings.smartQuantities.find(
     (rule) => watchedName.toLowerCase().includes(rule.itemName.toLowerCase())
@@ -118,6 +136,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       unit: data.unit || '',
       notes: data.notes || '',
       store: data.store || '',
+      image: data.image || '',
     };
     
     if (item) { 
@@ -129,6 +148,34 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     }
     onClose();
   };
+
+  const handleDeleteItem = () => {
+    if (item) {
+      deleteItemInList(listId, item.id);
+      toast({ title: "Item Deleted", description: `"${item.name}" has been removed.`});
+      onClose();
+    }
+  };
+
+  const handleImageUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setValue('image', reader.result as string, { shouldValidate: true });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageRemove = () => {
+    setValue('image', '', { shouldValidate: true });
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -201,19 +248,74 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                   <WheatOff size={20}/> Gluten Free
               </Button>
             </div>
-            
+
+            {/* Photo */}
+            <div>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleImageInputChange}
+              />
+              {watchedImage ? (
+                <div className="mt-2 relative">
+                  <Image src={watchedImage} alt="Item Preview" width={100} height={100} className="rounded-md w-full h-auto max-h-48 object-contain bg-muted" />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6"
+                    onClick={handleImageRemove}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Photo
+                </Button>
+              )}
+            </div>
+
             {/* Notes */}
             <Controller name="notes" control={control} render={({ field }) => <Textarea {...field} placeholder="Notes (e.g., Brand X, low fat)..." rows={2}/>} />
 
           </div>
 
-          <DialogFooter className="mt-4 sm:justify-between gap-2">
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : (item ? 'Save Changes' : 'Add Item')}
-            </Button>
+          <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
+            <div>
+              {item && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                      <Button type="button" variant="destructive">
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                      <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                              This will permanently delete "{item.name}". This action cannot be undone.
+                          </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteItem}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">Cancel</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : (item ? 'Save Changes' : 'Add Item')}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
