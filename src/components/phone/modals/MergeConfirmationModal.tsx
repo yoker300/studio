@@ -14,19 +14,23 @@ import { Button } from '@/components/ui/button';
 import { Item } from '@/lib/types';
 import { ArrowDown } from 'lucide-react';
 
-const ItemDisplay = ({ item }: { item: Partial<Item> }) => (
-  <div className="p-3 bg-muted rounded-md text-left w-full">
-    <div className="font-bold flex items-center gap-2">
-      <span className="text-2xl">{item.icon}</span>
-      {item.name}
-    </div>
-    <div className="text-sm text-muted-foreground pl-8">
-      {item.qty} {item.unit}
-      {item.store && ` from ${item.store}`}
-      {item.notes && ` (${item.notes})`}
-    </div>
-  </div>
-);
+const ItemDisplay = ({ item }: { item: Partial<Item> }) => {
+    const combinedNotes = [item.unit, item.store, item.notes].filter(Boolean).join(' / ');
+    return (
+      <div className="p-3 bg-muted rounded-md text-left w-full">
+        <div className="font-bold flex items-center gap-2">
+          <span className="text-2xl">{item.icon}</span>
+          {item.name}
+          {item.qty && item.qty > 1 && <span className="text-sm font-normal text-muted-foreground">(x{item.qty})</span>}
+        </div>
+        {combinedNotes && (
+            <div className="text-sm text-muted-foreground pl-8">
+               {combinedNotes}
+            </div>
+        )}
+      </div>
+    );
+};
 
 
 export function MergeConfirmationModal() {
@@ -35,6 +39,15 @@ export function MergeConfirmationModal() {
 
   const { mergeProposal, confirmMerge, declineMerge } = context;
   const { existingItem, newItemData } = mergeProposal;
+
+  const mergedItemPreview: Partial<Item> = {
+    name: existingItem.name,
+    icon: existingItem.icon,
+    qty: (existingItem.qty || 0) + (newItemData.qty || 0),
+    unit: existingItem.unit || newItemData.unit,
+    notes: [existingItem.notes, newItemData.notes].filter(Boolean).join(', '),
+    store: [existingItem.store, newItemData.store].filter(Boolean).join(', '),
+  }
 
   return (
     <Dialog open={!!mergeProposal} onOpenChange={(isOpen) => !isOpen && declineMerge(false)}>
@@ -52,13 +65,7 @@ export function MergeConfirmationModal() {
             <ItemDisplay item={existingItem} />
             <ArrowDown className="my-2 text-primary h-6 w-6"/>
             <div className="font-bold text-lg self-start">Combined Result:</div>
-            <ItemDisplay item={{
-                ...newItemData,
-                name: existingItem.name,
-                icon: existingItem.icon,
-                qty: (existingItem.qty || 0) + (newItemData.qty || 0),
-                store: (existingItem.store || newItemData.store || '').trim(),
-            }} />
+            <ItemDisplay item={mergedItemPreview} />
         </div>
 
         <DialogFooter className="grid grid-cols-2 gap-2">

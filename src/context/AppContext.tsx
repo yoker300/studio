@@ -27,7 +27,25 @@ const _commitItemToList = (firestore: Firestore, listId: string, list: List, ite
 };
 
 const _performMerge = (firestore: Firestore, listId: string, list: List, existingItem: Item, newItemData: Omit<Item, 'id' | 'checked'>) => {
-    const updatedItems = list.items.map(i => i.id === existingItem.id ? { ...i, name: existingItem.name, qty: i.qty + newItemData.qty, urgent: i.urgent || newItemData.urgent, store: (existingItem.store || newItemData.store || '').trim() } : i);
+    const updatedItems = list.items.map(i => {
+        if (i.id === existingItem.id) {
+            const combinedNotes = [existingItem.notes, newItemData.notes].filter(Boolean).join(', ');
+            const combinedStore = [existingItem.store, newItemData.store].filter(Boolean).join(', ');
+
+            return {
+                ...i, // Start with the existing item's base properties (id, checked status)
+                name: existingItem.name, // Keep original name
+                icon: existingItem.icon, // Keep original icon
+                qty: i.qty + (newItemData.qty || 0),
+                urgent: i.urgent || newItemData.urgent,
+                notes: combinedNotes,
+                store: combinedStore,
+                unit: i.unit || newItemData.unit, // Keep existing unit, fallback to new
+                gf: i.gf || newItemData.gf,
+            };
+        }
+        return i;
+    });
     updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
 };
 
@@ -114,7 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
   // Fetch profiles for all collaborators across all lists and recipes
   useEffect(() => {
-    if (!user || isDataLoading) return;
+    if (!user || isUserLoading) return;
     const allUserIds = new Set<string>();
 
     lists.forEach(list => {
@@ -150,7 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     fetchUsers().catch(console.error);
-  }, [lists, recipes, firestore, user, isDataLoading]);
+  }, [lists, recipes, firestore, user, isUserLoading]);
 
   // Effect to manage settings state from Firestore
   useEffect(() => {
@@ -229,15 +247,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
   // Effect to process the item queue in a controlled loop
   useEffect(() => {
-    if (pendingItemsQueue.length === 0 || mergeProposal || isDataLoading || !firestore) {
+    if (pendingItemsQueue.length === 0 || mergeProposal || !firestore) {
       return;
     }
 
     let isMounted = true;
 
     const processNextItem = async () => {
+      // Dequeue the next item
       const [currentItem, ...restOfQueue] = pendingItemsQueue;
-
+      if (!isMounted) return;
+      setPendingItemsQueue(restOfQueue);
+      
       try {
         const { listId, skipProcessing, ...itemData } = currentItem;
 
@@ -250,36 +271,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (!listSnap.exists()) {
           console.warn("List not found for item processing, requeueing...");
-          if(isMounted) setPendingItemsQueue([...restOfQueue, currentItem]); // Move to back of queue
+          if(isMounted) setPendingItemsQueue(prev => [currentItem, ...prev]); // Add back to front
           return;
         }
 
         const list = { ...listSnap.data(), id: listSnap.id } as List;
-        const newItemNotes = (newItemData.notes || '').trim();
-        const newItemStore = (newItemData.store || '').trim();
+        
+        // More flexible matching: find any unchecked item with the same canonical name.
+        const potentialMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName);
 
-        const perfectMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName && i.unit === newItemData.unit && (i.notes || '').trim() === newItemNotes && (i.store || '').trim() === newItemStore);
-        if (perfectMatch) {
-          _performMerge(firestore, listId, list, perfectMatch, newItemData);
-          if(isMounted) setPendingItemsQueue(restOfQueue);
-          return;
-        }
-
-        const storeProposalMatch = list.items.find(i => !i.checked && i.canonicalName === newItemData.canonicalName && i.unit === newItemData.unit && (i.notes || '').trim() === newItemNotes && ((!!(i.store || '').trim() && !newItemStore) || (!((i.store || '').trim()) && !!newItemStore)));
-        if (storeProposalMatch) {
-          if(isMounted) {
-            setMergeProposal({ existingItem: storeProposalMatch, newItemData: newItemData, listId: listId });
-            // Keep item at front of queue, pause processing
-          }
-          return;
+        if (potentialMatch) {
+            if(isMounted) {
+                // Found a potential duplicate, so ask the user.
+                setMergeProposal({ existingItem: potentialMatch, newItemData: newItemData, listId: listId });
+                // Re-queue the item at the front. It will be handled by confirm/decline merge.
+                setPendingItemsQueue(prev => [currentItem, ...prev]);
+            }
+            return; // Stop processing until user decides
         }
         
+        // No match found, so add it as a new item.
         _commitItemToList(firestore, listId, list, newItemData);
-        if(isMounted) setPendingItemsQueue(restOfQueue);
 
       } catch (error) {
         console.error("Error processing item queue:", error);
-        if(isMounted) setPendingItemsQueue(restOfQueue);
       }
     };
     
@@ -289,7 +304,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     }
 
-  }, [pendingItemsQueue, mergeProposal, isDataLoading, firestore, toast]);
+  }, [pendingItemsQueue, mergeProposal, firestore, toast]);
 
   const confirmMerge = async () => {
     if (!mergeProposal || !firestore) return;
@@ -303,6 +318,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       _performMerge(firestore, listId, list, existingItem, newItemData);
     }
     
+    // Item has been dealt with, so remove it from the queue and reset the proposal
     const [_, ...restOfQueue] = pendingItemsQueue;
     setPendingItemsQueue(restOfQueue);
     setMergeProposal(null);
@@ -321,6 +337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
       
+      // Item has been dealt with, so remove it from the queue and reset the proposal
       const [_, ...restOfQueue] = pendingItemsQueue;
       setPendingItemsQueue(restOfQueue);
       setMergeProposal(null);
