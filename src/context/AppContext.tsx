@@ -1,12 +1,13 @@
 'use client';
 
 import { createContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile } from '@/lib/types';
+import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile, Invite } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, writeBatch, arrayUnion, getDoc } from 'firebase/firestore';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
@@ -49,7 +50,8 @@ type AppContextType = {
   clearGeneratedRecipe: () => void;
   confirmMerge: () => void;
   declineMerge: (keepSeparate?: boolean) => void;
-  addCollaborator: (entityType: 'list' | 'recipe', entityId: string, email: string) => Promise<boolean>;
+  createInvite: (entityType: 'list' | 'recipe', entityId: string) => Promise<string | null>;
+  acceptInvite: (inviteId: string) => Promise<void>;
   removeCollaborator: (entityType: 'list' | 'recipe', entityId: string, userId: string) => void;
 };
 
@@ -59,6 +61,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [currentView, setCurrentView] = useState<View>({ type: 'lists' });
@@ -100,7 +104,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Fetch profiles for all collaborators across all lists and recipes
   useEffect(() => {
-    if (!user || isDataLoading) return;
+    if (!user || isUserLoading || loadingOwnedLists || loadingCollabLists || loadingOwnedRecipes || loadingCollabRecipes) return;
     const allUserIds = new Set<string>();
 
     lists.forEach(list => {
@@ -137,8 +141,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     fetchUsers().catch(console.error);
-  }, [lists, recipes, firestore, user, isDataLoading]);
+  }, [lists, recipes, firestore, user, isUserLoading, loadingOwnedLists, loadingCollabLists, loadingOwnedRecipes, loadingCollabRecipes]);
 
+  // Effect to handle invite links from URL
+  useEffect(() => {
+    const inviteId = searchParams.get('invite');
+    if (inviteId && user) {
+      acceptInvite(inviteId);
+      // Remove the query param from URL to avoid re-triggering
+      router.replace(window.location.pathname);
+    }
+  }, [searchParams, user]); // Rerun when user logs in
   
   // Effect to manage settings state from Firestore
   useEffect(() => {
@@ -312,17 +325,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const list = lists.find(l => l.id === listId);
     if (!list) return;
 
-    // The previous implementation deleted the item and re-added it via the AI queue.
-    // This is incorrect for an update and causes permission issues for collaborators.
-    // The correct approach is to find the item and update it in place.
     const updatedItems = list.items.map(item =>
       item.id === updatedItem.id ? updatedItem : item
     );
 
-    // Perform a single update operation on the document
     updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
 
-    // Since this is a direct edit, we provide immediate feedback.
     toast({ title: "Item Updated", description: `"${updatedItem.name}" has been saved.` });
   };
   
@@ -368,7 +376,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const recipe = recipes.find(r => r.id === recipeId);
     if (!recipe) return;
     
-    const itemsToQueue = recipe.ingredients.map(ingredient => ({ ...ingredient, listId, skipProcessing: true }));
+    const itemsToQueue = recipe.ingredients.map(ingredient => ({ ...ingredient, listId, skipProcessing: false }));
     setPendingItemsQueue(prev => [...prev, ...itemsToQueue]);
 
     toast({ title: "Recipe Added", description: `Ingredients from ${recipe.name} will be added to your list.` });
@@ -383,47 +391,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDocumentNonBlocking(settingsRef, updatedState, { merge: true });
   };
   
-  const addCollaborator = async (entityType: 'list' | 'recipe', entityId: string, email: string): Promise<boolean> => {
-    const usersCollection = collection(firestore, 'users');
-    const q = query(usersCollection, where("email", "==", email));
-    
+  const createInvite = async (entityType: 'list' | 'recipe', entityId: string): Promise<string | null> => {
+    if (!user) return null;
     try {
-      const querySnapshot = await getDocs(q);
+      const newInviteRef = doc(collection(firestore, 'invites'));
+      const inviteData: Invite = {
+        id: newInviteRef.id,
+        entityType,
+        entityId,
+        ownerId: user.uid,
+        createdAt: new Date(),
+        used: false,
+      };
+      await setDocumentNonBlocking(newInviteRef, inviteData, {});
+      toast({ title: 'Invite Link Created', description: 'Share the link with your friend.' });
+      return `${window.location.origin}?invite=${newInviteRef.id}`;
+    } catch (e) {
+      console.error("Error creating invite:", e);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not create invite link.' });
+      return null;
+    }
+  };
 
-      if (querySnapshot.empty) {
-          toast({ variant: 'destructive', title: 'User not found' });
-          return false;
-      }
-      
-      const targetUser = querySnapshot.docs[0].data() as UserProfile;
-      const entityCollection = entityType === 'list' ? 'lists' : 'recipes';
-      const entity = entityType === 'list' ? lists.find(e => e.id === entityId) : recipes.find(e => e.id === entityId);
-      
-      if (entity && entity.ownerId !== targetUser.uid && !entity.collaborators.includes(targetUser.uid)) {
-        const updatedCollaborators = [...entity.collaborators, targetUser.uid];
-        updateDocumentNonBlocking(doc(firestore, entityCollection, entityId), { collaborators: updatedCollaborators });
-        toast({ title: 'Collaborator Added' });
-        // Manually add user to local state to trigger UI update
-        setUsers(prev => [...prev, targetUser]);
-        return true;
+  const acceptInvite = async (inviteId: string) => {
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Please Sign In', description: 'You must be signed in to accept an invite.' });
+      return;
+    }
+  
+    const inviteRef = doc(firestore, 'invites', inviteId);
+    const inviteSnap = await getDoc(inviteRef);
+  
+    if (!inviteSnap.exists() || inviteSnap.data().used) {
+      toast({ variant: 'destructive', title: 'Invalid Invite', description: 'This invite link is invalid or has already been used.' });
+      return;
+    }
+  
+    const invite = inviteSnap.data() as Invite;
+    const entityCollection = invite.entityType === 'list' ? 'lists' : 'recipes';
+    const entityRef = doc(firestore, entityCollection, invite.entityId);
+  
+    try {
+      await updateDocumentNonBlocking(entityRef, {
+        collaborators: arrayUnion(user.uid)
+      });
+  
+      await updateDocumentNonBlocking(inviteRef, { used: true });
+  
+      toast({ title: 'Invitation Accepted!', description: `You can now collaborate on this ${invite.entityType}.` });
+  
+      if (invite.entityType === 'list') {
+        navigate({ type: 'listDetail', listId: invite.entityId });
       } else {
-         toast({ variant: 'destructive', title: 'Cannot add owner or user is already a collaborator.' });
+        navigate({ type: 'recipeDetail', recipeId: invite.entityId });
       }
-
     } catch (error) {
-      console.error(error); // Keep this for logging
-      
+      console.error('Error accepting invite:', error);
       const contextualError = new FirestorePermissionError({
-        path: 'users', // path of the collection being queried
-        operation: 'list'
+        path: entityRef.path,
+        operation: 'update',
+        requestResourceData: { collaborators: arrayUnion(user.uid) },
       });
       errorEmitter.emit('permission-error', contextualError);
-      
-      toast({ variant: 'destructive', title: 'Permissions Error', description: 'Could not search for user.' });
-      return false;
     }
-    
-    return false;
   };
   
   const removeCollaborator = (entityType: 'list' | 'recipe', entityId: string, userId: string) => {
@@ -441,7 +471,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lists, recipes, settings, isDataLoading, currentView, activeTab, urgentMode, generatedRecipe, mergeProposal, users,
     navigate, vibrate, addList, updateList, deleteList, addItemToList, addSmartItemToList, updateItemInList, deleteItemInList,
     toggleItemChecked, setUrgentMode, addRecipe, updateRecipe, deleteRecipe, addRecipeToList, updateSettings, setGeneratedRecipe,
-    clearGeneratedRecipe, confirmMerge, declineMerge, addCollaborator, removeCollaborator
+    clearGeneratedRecipe, confirmMerge, declineMerge, createInvite, acceptInvite, removeCollaborator
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
