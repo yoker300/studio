@@ -206,7 +206,10 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md p-4">
+      <DialogContent 
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="sm:max-w-md p-4"
+      >
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>{item ? 'Edit Item' : 'Add Item'}</DialogTitle>
@@ -306,12 +309,12 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
             </div>
 
             {/* Notes */}
-            <Textarea {...control.register('notes')} placeholder="Notes (e.g., Brand X, low fat)..." rows={2} />
+            <Textarea {...control.register('notes')} placeholder="Notes (e.g., Brand X, low fat)..." rows={2} className="rtl:text-right" />
 
           </div>
 
-          <DialogFooter className="mt-4 flex items-center">
-            <div className="flex-initial">
+          <DialogFooter className="mt-4 flex flex-row justify-between items-center">
+            <div>
               {item && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -334,7 +337,6 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 </AlertDialog>
               )}
             </div>
-            <div className="flex-grow" />
             <div className="flex gap-2">
               <DialogClose asChild>
                 <Button type="button" variant="secondary">Cancel</Button>
