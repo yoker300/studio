@@ -62,7 +62,6 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   const storage = useStorage();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const itemId = useMemo(() => item?.id || uuidv4(), [item]);
@@ -246,7 +245,6 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               render={({ field }) => (
                 <Input
                   {...field}
-                  ref={nameInputRef}
                   placeholder="Item Name"
                   className="text-2xl font-headline font-bold h-14 flex-1"
                 />
@@ -329,11 +327,11 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
             </div>
 
             {/* Notes */}
-            <Textarea {...control.register('notes')} placeholder="Notes (e.g., Brand X, low fat)..." rows={2} className="rtl:text-right" />
+            <Textarea {...control.register('notes')} placeholder="Notes (e.g., Brand X, low fat)..." rows={2} />
 
           </div>
 
-          <DialogFooter className="mt-4 flex justify-between items-center">
+          <DialogFooter className="mt-4 flex items-center">
             <div>
               {item && (
                 <AlertDialog>
@@ -357,6 +355,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 </AlertDialog>
               )}
             </div>
+            <div className="flex-grow" />
             <div className="flex gap-2">
               <DialogClose asChild>
                 <Button type="button" variant="secondary">Cancel</Button>
