@@ -55,10 +55,57 @@ type ItemEditModalProps = {
   listId: string;
 };
 
+// Helper function for image compression
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const MAX_WIDTH = 800; // Reduced for better compression
+    const MAX_HEIGHT = 800;
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Could not get canvas context'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Get the data-URL as a JPEG image with quality 70%
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(dataUrl);
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+
 export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalProps) {
   const context = useContext(AppContext);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -80,6 +127,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
+      setIsCompressing(false);
       if (item) {
         reset({
           icon: item.icon || '🛒', name: item.name, qty: item.qty, unit: item.unit,
@@ -110,6 +158,17 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   );
 
   const onSubmit = (data: ItemFormData) => {
+    // ~950KB limit for base64 string to leave a buffer in the 1MB doc limit.
+    const MAX_DATA_URL_LENGTH = 950 * 1024;
+    if (data.image && data.image.length > MAX_DATA_URL_LENGTH) {
+        toast({
+            variant: "destructive",
+            title: "Image Too Large",
+            description: `The compressed image is still too large (${Math.round(data.image.length / 1024)}KB). Please use a smaller image.`,
+        });
+        return; // Stop submission
+    }
+
     setIsSaving(true);
 
     const itemData: Item = {
@@ -141,18 +200,27 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     fileInputRef.current?.click();
   };
 
-  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setImagePreview(dataUrl);
-        setValue('image', dataUrl, { shouldValidate: true });
-      };
-      reader.readAsDataURL(file);
+      setIsCompressing(true);
+      toast({ title: 'Compressing image...' });
+      try {
+        const compressedDataUrl = await compressImage(file);
+        setImagePreview(compressedDataUrl);
+        setValue('image', compressedDataUrl, { shouldValidate: true });
+        toast({ title: 'Compression complete!' });
+      } catch (error) {
+        console.error("Image compression failed:", error);
+        toast({ variant: 'destructive', title: 'Compression Failed', description: 'Could not process the image.' });
+        setImagePreview(null);
+        setValue('image', '', { shouldValidate: true });
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
+
 
   const handleImageRemove = () => {
     setImagePreview(null);
@@ -242,6 +310,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleImageInputChange}
+                disabled={isCompressing}
               />
               {imagePreview ? (
                 <div className="mt-2 relative">
@@ -257,9 +326,9 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                   </Button>
                 </div>
               ) : (
-                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick}>
+                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick} disabled={isCompressing}>
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Photo
+                  {isCompressing ? 'Compressing...' : 'Upload Photo'}
                 </Button>
               )}
             </div>
@@ -274,7 +343,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               {item && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" disabled={isSaving}>
+                      <Button type="button" variant="destructive" disabled={isSaving || isCompressing}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </Button>
                   </AlertDialogTrigger>
@@ -297,7 +366,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               <DialogClose asChild>
                 <Button type="button" variant="secondary">Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving || isCompressing}>
                 {isSaving ? "Saving..." : (item ? 'Save Changes' : 'Add Item')}
               </Button>
             </div>
