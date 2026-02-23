@@ -103,7 +103,6 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           gf: item.gf,
           image: item.image,
         });
-        setTimeout(() => nameInputRef.current?.focus(), 100);
       } else {
         reset({
           icon: '🛒',
