@@ -125,6 +125,57 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     (rule) => watchedName.toLowerCase().includes(rule.itemName.toLowerCase())
   );
 
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const MAX_DIMENSION = 800;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = document.createElement('img');
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_DIMENSION) {
+                        height *= MAX_DIMENSION / width;
+                        width = MAX_DIMENSION;
+                    }
+                } else {
+                    if (height > MAX_DIMENSION) {
+                        width *= MAX_DIMENSION / height;
+                        height = MAX_DIMENSION;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+
+                if (!ctx) {
+                    return reject(new Error('Failed to get canvas context'));
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        return reject(new Error('Canvas to Blob failed'));
+                    }
+                    const newFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    resolve(newFile);
+                }, 'image/jpeg', 0.8); // 80% quality
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+  };
+
   const onSubmit = (data: ItemFormData) => {
     setIsSaving(true);
     const finalItemId = item?.id || itemId;
@@ -180,18 +231,34 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     fileInputRef.current?.click();
   };
 
-  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // If there's a temporary blob preview, revoke it to prevent memory leaks
     if (imagePreview && imagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(imagePreview);
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
-    setImageFile(file); // Stage the file for upload on save
+    toast({ title: "Compressing image..." });
+
+    try {
+        const compressedFile = await compressImage(file);
+        const previewUrl = URL.createObjectURL(compressedFile);
+        setImagePreview(previewUrl);
+        setImageFile(compressedFile);
+        toast({ title: "Image ready for upload!" });
+    } catch (error) {
+        console.error("Image compression failed:", error);
+        toast({
+            variant: "destructive",
+            title: "Compression Failed",
+            description: "Could not compress the image. The original file will be used.",
+        });
+        // Fallback to original file
+        const previewUrl = URL.createObjectURL(file);
+        setImagePreview(previewUrl);
+        setImageFile(file);
+    }
   };
 
   const handleImageRemove = () => {
