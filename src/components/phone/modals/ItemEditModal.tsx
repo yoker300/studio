@@ -28,7 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Minus, Plus, Zap, WheatOff, Trash2, Upload, X } from 'lucide-react';
+import { Minus, Plus, Zap, WheatOff, Trash2, Upload, X, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -107,6 +107,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   const [isSaving, setIsSaving] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -312,6 +313,15 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 onChange={handleImageInputChange}
                 disabled={isCompressing}
               />
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={cameraInputRef}
+                className="hidden"
+                onChange={handleImageInputChange}
+                disabled={isCompressing}
+              />
               {imagePreview ? (
                 <div className="mt-2 relative">
                   <Image src={imagePreview} alt="Item Preview" width={100} height={100} className="rounded-md w-full h-auto max-h-48 object-contain bg-muted" />
@@ -326,10 +336,16 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                   </Button>
                 </div>
               ) : (
-                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick} disabled={isCompressing}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  {isCompressing ? 'Compressing...' : 'Upload Photo'}
-                </Button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <Button type="button" variant="outline" className="w-full" onClick={handleImageUploadClick} disabled={isCompressing}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isCompressing ? 'Compressing...' : 'Upload'}
+                  </Button>
+                   <Button type="button" variant="outline" className="w-full" onClick={() => cameraInputRef.current?.click()} disabled={isCompressing}>
+                    <Camera className="mr-2 h-4 w-4" />
+                    {isCompressing ? '...' : 'Take Photo'}
+                  </Button>
+                </div>
               )}
             </div>
 
