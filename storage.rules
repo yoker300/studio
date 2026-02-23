@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Match any file in the 'items' directory
+    match /items/{itemId}/{allPaths=**} {
+      
+      // Anyone can read any image.
+      // URLs are unguessable, providing security by obscurity.
+      // This is necessary for collaborators to see images.
+      allow read: if true;
+      
+      // Only authenticated users can upload, update, or delete images.
+      // The client-side application logic is responsible for ensuring
+      // that a user is an owner or collaborator on a list before
+      // attempting a write or delete operation on an item's image.
+      // We also enforce a size limit to prevent abuse.
+      allow write, delete: if request.auth != null &&
+                             request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+  }
+}

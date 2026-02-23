@@ -1,11 +1,11 @@
 'use client';
 
-import { useContext, useEffect, useState, useRef } from 'react';
+import { useContext, useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { AppContext } from '@/context/AppContext';
-import { Item } from '@/lib/types';
+import { Item, List } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,9 @@ import { Minus, Plus, Zap, WheatOff, Trash2, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { useStorage } from '@/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
 
 const itemSchema = z.object({
   icon: z.string().min(1, "Icon is required."),
@@ -56,10 +59,13 @@ type ItemEditModalProps = {
 
 export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalProps) {
   const context = useContext(AppContext);
+  const storage = useStorage();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const itemId = useMemo(() => item?.id || uuidv4(), [item]);
 
   const {
     control,
@@ -132,6 +138,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     setIsSubmitting(true);
     const itemData = {
       ...data,
+      id: itemId, // Ensure ID is consistent
       category: item?.category || '',
       unit: data.unit || '',
       notes: data.notes || '',
@@ -140,7 +147,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     };
     
     if (item) {
-      updateItemInList(listId, { ...item, ...itemData });
+      updateItemInList(listId, itemData);
     } else {
       addItemToList(listId, { ...itemData, checked: false });
       toast({ title: "Item Added to Queue", description: `"${data.name}" will be processed.`});
@@ -148,8 +155,17 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     onClose();
   };
 
-  const handleDeleteItem = () => {
+  const handleDeleteItem = async () => {
     if (item) {
+      if (item.image) {
+        try {
+          const imageRef = ref(storage, item.image);
+          await deleteObject(imageRef);
+        } catch (error) {
+          console.error("Failed to delete image from storage:", error);
+          toast({ variant: 'destructive', title: 'Image Deletion Failed', description: 'Could not remove the old image from storage.'})
+        }
+      }
       deleteItemInList(listId, item.id);
       toast({ title: "Item Deleted", description: `"${item.name}" has been removed.`});
       onClose();
@@ -160,19 +176,52 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     fileInputRef.current?.click();
   };
 
-  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setValue('image', reader.result as string, { shouldValidate: true });
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    setIsSubmitting(true);
+    toast({ title: "Uploading image..." });
+
+    // If there's an old image, delete it first.
+    if (watchedImage) {
+      try {
+        const oldImageRef = ref(storage, watchedImage);
+        await deleteObject(oldImageRef);
+      } catch (error) {
+         console.warn("Could not delete old image, it may have already been removed:", error);
+      }
+    }
+
+    const imageRef = ref(storage, `items/${itemId}/${file.name}`);
+
+    try {
+      const snapshot = await uploadBytes(imageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      setValue('image', downloadURL, { shouldValidate: true });
+      toast({ title: "Upload complete!" });
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload image.' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleImageRemove = () => {
-    setValue('image', '', { shouldValidate: true });
+  const handleImageRemove = async () => {
+    if (!watchedImage) return;
+    setIsSubmitting(true);
+    try {
+      const imageRef = ref(storage, watchedImage);
+      await deleteObject(imageRef);
+      setValue('image', '', { shouldValidate: true });
+      toast({ title: "Image removed." });
+    } catch (error) {
+      console.error("Image removal failed:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not remove image.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
@@ -256,6 +305,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleImageInputChange}
+                disabled={isSubmitting}
               />
               {watchedImage ? (
                 <div className="mt-2 relative">
@@ -266,12 +316,13 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                     size="icon"
                     className="absolute top-1 right-1 h-6 w-6"
                     onClick={handleImageRemove}
+                    disabled={isSubmitting}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
-                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick}>
+                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick} disabled={isSubmitting}>
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Photo
                 </Button>
@@ -288,7 +339,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               {item && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive">
+                      <Button type="button" variant="destructive" disabled={isSubmitting}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </Button>
                   </AlertDialogTrigger>

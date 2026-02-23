@@ -4,9 +4,10 @@ import { createContext, useState, useEffect, ReactNode, useCallback, useMemo } f
 import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase, useStorage } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc, query, where, getDocs, writeBatch, arrayUnion, getDoc, Firestore } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
@@ -88,7 +89,7 @@ type AppContextType = {
 export const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { firestore } = useFirebase();
+  const { firestore, storage } = useFirebase();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
 
@@ -364,6 +365,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     vibrate();
     const list = lists.find(l => l.id === listId);
     if (!list) return;
+
+    const itemToDelete = list.items.find(item => item.id === itemId);
+
+    // Delete image from storage if it exists
+    if (itemToDelete?.image) {
+      const imageRef = ref(storage, itemToDelete.image);
+      deleteObject(imageRef).catch(error => {
+        console.error("Failed to delete image from storage:", error);
+        toast({ variant: 'destructive', title: 'Cleanup Failed', description: 'Could not remove the old image file.'})
+      })
+    }
+
     const updatedItems = list.items.filter(item => item.id !== itemId);
     updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
   };
