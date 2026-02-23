@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { AppContext } from '@/context/AppContext';
-import { Item, List } from '@/lib/types';
+import { Item } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { useStorage } from '@/firebase';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, deleteObject } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 
 const itemSchema = z.object({
@@ -45,7 +45,7 @@ const itemSchema = z.object({
   notes: z.string().optional(),
   urgent: z.boolean(),
   gf: z.boolean(),
-  image: z.string().optional(),
+  image: z.string().optional(), // This will hold the existing image URL
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
@@ -61,9 +61,12 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   const context = useContext(AppContext);
   const storage = useStorage();
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
   const itemId = useMemo(() => item?.id || uuidv4(), [item]);
 
   const {
@@ -75,95 +78,98 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   } = useForm<ItemFormData>({
     resolver: zodResolver(itemSchema),
     defaultValues: {
-      icon: '🛒',
-      name: '',
-      qty: 1,
-      unit: '',
-      store: '',
-      notes: '',
-      urgent: false,
-      gf: false,
-      image: '',
+      icon: '🛒', name: '', qty: 1, unit: '', store: '', notes: '',
+      urgent: false, gf: false, image: '',
     },
   });
 
   useEffect(() => {
     if (isOpen) {
-      setIsSubmitting(false);
+      setIsSaving(false);
       if (item) {
         reset({
-          icon: item.icon || '🛒',
-          name: item.name,
-          qty: item.qty,
-          unit: item.unit,
-          store: item.store,
-          notes: item.notes,
-          urgent: item.urgent,
-          gf: item.gf,
-          image: item.image,
+          icon: item.icon || '🛒', name: item.name, qty: item.qty, unit: item.unit,
+          store: item.store, notes: item.notes, urgent: item.urgent, gf: item.gf, image: item.image,
         });
+        setImagePreview(item.image || null);
       } else {
         reset({
-          icon: '🛒',
-          name: '',
-          qty: 1,
-          unit: '',
-          store: '',
-          notes: '',
-          urgent: false,
-          gf: false,
-          image: '',
+          icon: '🛒', name: '', qty: 1, unit: '', store: '', notes: '',
+          urgent: false, gf: false, image: '',
         });
+        setImagePreview(null);
       }
+      setImageFile(null); // Always clear staged file
     }
   }, [item, isOpen, reset]);
 
+  // Clean up blob URL
+  useEffect(() => {
+    return () => {
+        if (imagePreview && imagePreview.startsWith('blob:')) {
+            URL.revokeObjectURL(imagePreview);
+        }
+    };
+  }, [imagePreview]);
+
 
   if (!context) return null;
-  const { addItemToList, updateItemInList, settings, deleteItemInList } = context;
+  const { addItemToList, updateItemInList, settings, deleteItemInList, uploadItemImageInBackground } = context;
 
   const watchedName = watch('name');
   const watchedQty = watch('qty');
   const watchedUrgent = watch('urgent');
   const watchedGf = watch('gf');
-  const watchedImage = watch('image');
   
   const smartQuantityRule = settings.smartQuantities.find(
     (rule) => watchedName.toLowerCase().includes(rule.itemName.toLowerCase())
   );
 
   const onSubmit = (data: ItemFormData) => {
-    setIsSubmitting(true);
-    const itemData = {
-      ...data,
-      id: itemId, // Ensure ID is consistent
-      category: item?.category || '',
-      unit: data.unit || '',
-      notes: data.notes || '',
-      store: data.store || '',
-      image: data.image || '',
+    setIsSaving(true);
+    const finalItemId = item?.id || itemId;
+
+    // Determine if an existing image was removed by the user
+    const imageWasRemoved = !!(item?.image && !imagePreview);
+
+    // Prepare the main item data for an immediate save.
+    // The image URL will be updated later by the background task if a new one is being uploaded.
+    const itemData: Item = {
+        ...data,
+        id: finalItemId,
+        category: item?.category || '',
+        checked: item?.checked || false,
+        image: imageWasRemoved ? '' : (item?.image || ''),
     };
-    
+
+    // Immediately save the text-based data.
     if (item) {
-      updateItemInList(listId, itemData);
+        updateItemInList(listId, itemData);
     } else {
-      addItemToList(listId, { ...itemData, checked: false });
-      toast({ title: "Item Added to Queue", description: `"${data.name}" will be processed.`});
+        addItemToList(listId, itemData);
     }
-    onClose();
+
+    // --- Handle Background Tasks ---
+
+    // 1. If a new file was selected, start the background upload.
+    if (imageFile) {
+        uploadItemImageInBackground(listId, finalItemId, imageFile, item?.image);
+    } 
+    // 2. If an existing image was removed (and no new one was added), delete it from storage.
+    else if (imageWasRemoved && item?.image) {
+        const oldImageRef = ref(storage, item.image);
+        deleteObject(oldImageRef).catch(err => {
+            console.error("Failed to delete old image from storage", err);
+            toast({ variant: 'destructive', title: "Image Cleanup Failed", description: "Could not remove the old image file." });
+        });
+    }
+
+    onClose(); // Close the modal immediately.
   };
 
   const handleDeleteItem = async () => {
     if (item) {
-      if (item.image) {
-        try {
-          const imageRef = ref(storage, item.image);
-          await deleteObject(imageRef);
-        } catch (error) {
-          console.error("Failed to delete image from storage:", error);
-          toast({ variant: 'destructive', title: 'Image Deletion Failed', description: 'Could not remove the old image from storage.'})
-        }
-      }
+      // The deleteItemInList function in context already handles deleting the storage object.
       deleteItemInList(listId, item.id);
       toast({ title: "Item Deleted", description: `"${item.name}" has been removed.`});
       onClose();
@@ -174,52 +180,27 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     fileInputRef.current?.click();
   };
 
-  const handleImageInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setIsSubmitting(true);
-    toast({ title: "Uploading image..." });
-
-    // If there's an old image, delete it first.
-    if (watchedImage) {
-      try {
-        const oldImageRef = ref(storage, watchedImage);
-        await deleteObject(oldImageRef);
-      } catch (error) {
-         console.warn("Could not delete old image, it may have already been removed:", error);
-      }
+    // If there's a temporary blob preview, revoke it to prevent memory leaks
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
     }
 
-    const imageRef = ref(storage, `items/${itemId}/${file.name}`);
-
-    try {
-      const snapshot = await uploadBytes(imageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      setValue('image', downloadURL, { shouldValidate: true });
-      toast({ title: "Upload complete!" });
-    } catch (error) {
-      console.error("Image upload failed:", error);
-      toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload image.' });
-    } finally {
-      setIsSubmitting(false);
-    }
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+    setImageFile(file); // Stage the file for upload on save
   };
 
-  const handleImageRemove = async () => {
-    if (!watchedImage) return;
-    setIsSubmitting(true);
-    try {
-      const imageRef = ref(storage, watchedImage);
-      await deleteObject(imageRef);
-      setValue('image', '', { shouldValidate: true });
-      toast({ title: "Image removed." });
-    } catch (error) {
-      console.error("Image removal failed:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not remove image.' });
-    } finally {
-      setIsSubmitting(false);
+  const handleImageRemove = () => {
+    // Just update the UI state. `onSubmit` will handle the actual deletion.
+    if (imagePreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
     }
+    setImagePreview(null);
+    setImageFile(null);
   };
 
 
@@ -302,24 +283,22 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleImageInputChange}
-                disabled={isSubmitting}
               />
-              {watchedImage ? (
+              {imagePreview ? (
                 <div className="mt-2 relative">
-                  <Image src={watchedImage} alt="Item Preview" width={100} height={100} className="rounded-md w-full h-auto max-h-48 object-contain bg-muted" />
+                  <Image src={imagePreview} alt="Item Preview" width={100} height={100} className="rounded-md w-full h-auto max-h-48 object-contain bg-muted" />
                   <Button
                     type="button"
                     variant="destructive"
                     size="icon"
                     className="absolute top-1 right-1 h-6 w-6"
                     onClick={handleImageRemove}
-                    disabled={isSubmitting}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
-                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick} disabled={isSubmitting}>
+                <Button type="button" variant="outline" className="mt-2 w-full" onClick={handleImageUploadClick}>
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Photo
                 </Button>
@@ -332,11 +311,11 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
           </div>
 
           <DialogFooter className="mt-4 flex items-center">
-            <div>
+            <div className="flex-initial">
               {item && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" disabled={isSubmitting}>
+                      <Button type="button" variant="destructive" disabled={isSaving}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </Button>
                   </AlertDialogTrigger>
@@ -360,8 +339,8 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
               <DialogClose asChild>
                 <Button type="button" variant="secondary">Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : (item ? 'Save Changes' : 'Add Item')}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "Saving..." : (item ? 'Save Changes' : 'Add Item')}
               </Button>
             </div>
           </DialogFooter>

@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase, useStorage } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc, query, where, getDocs, writeBatch, arrayUnion, getDoc, Firestore } from 'firebase/firestore';
-import { ref, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
@@ -84,6 +84,7 @@ type AppContextType = {
   declineMerge: (keepSeparate?: boolean) => void;
   addCollaborator: (entityType: 'list' | 'recipe', entityId: string, email: string) => Promise<boolean>;
   removeCollaborator: (entityType: 'list' | 'recipe', entityId: string, userId: string) => void;
+  uploadItemImageInBackground: (listId: string, itemId: string, file: File, existingImageUrl?: string) => Promise<void>;
 };
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -250,7 +251,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     const processNextItem = async () => {
-      const currentItem = pendingItemsQueue[0]; // Peek at the item, don't dequeue yet
+      const currentItem = pendingItemsQueue[0];
       if (!currentItem) return;
 
       try {
@@ -264,11 +265,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const listSnap = await getDoc(listRef);
 
         if (!listSnap.exists()) {
-          console.warn(`List ${listId} not found for item processing, removing item from queue.`);
           toast({ title: 'List Not Found', description: `Could not add "${itemData.name}" because the list no longer exists.`, variant: 'destructive'});
-          if (isMounted) {
-            setPendingItemsQueue(prev => prev.slice(1)); // Dequeue failed item
-          }
+          if (isMounted) setPendingItemsQueue(prev => prev.slice(1));
           return;
         }
 
@@ -277,24 +275,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (potentialMatch) {
             if (isMounted) {
-                // Found a duplicate, so ask the user. The item stays in the queue.
                 setMergeProposal({ existingItem: potentialMatch, newItemData, listId });
             }
-            return; // Stop processing until user decides
+            return; 
         }
         
-        // No match, so add it.
         _commitItemToList(firestore, listId, list, newItemData);
 
         if (isMounted) {
-            setPendingItemsQueue(prev => prev.slice(1)); // Dequeue successfully added item
+            setPendingItemsQueue(prev => prev.slice(1)); 
         }
 
       } catch (error) {
-        console.error("Error processing item queue:", error);
         toast({ title: 'Processing Error', description: `Could not add "${currentItem.name}".`, variant: 'destructive'});
         if (isMounted) {
-          setPendingItemsQueue(prev => prev.slice(1)); // Dequeue failed item
+          setPendingItemsQueue(prev => prev.slice(1)); 
         }
       }
     };
@@ -318,8 +313,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       _performMerge(firestore, listId, list, existingItem, newItemData);
     }
     
-    setPendingItemsQueue(prev => prev.slice(1)); // Dequeue handled item
-    setMergeProposal(null); // Resume queue processing
+    setPendingItemsQueue(prev => prev.slice(1));
+    setMergeProposal(null);
   };
 
   const declineMerge = async (keepSeparate = true) => {
@@ -335,8 +330,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      setPendingItemsQueue(prev => prev.slice(1)); // Dequeue handled item
-      setMergeProposal(null); // Resume queue processing
+      setPendingItemsQueue(prev => prev.slice(1));
+      setMergeProposal(null);
   };
   
   const addSmartItemToList = (listId: string, itemData: Omit<Item, 'id' | 'checked' | 'canonicalName'> & { canonicalName?: string }) => {
@@ -471,11 +466,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const uploadItemImageInBackground = async (listId: string, itemId: string, file: File, existingImageUrl?: string) => {
+    toast({ title: "Uploading image...", description: `Image for item is uploading in the background.` });
+
+    try {
+        // 1. If there's an old image, delete it from storage.
+        if (existingImageUrl) {
+            const oldImageRef = ref(storage, existingImageUrl);
+            await deleteObject(oldImageRef).catch(e => console.warn("Could not delete old image, it may have already been removed.", e));
+        }
+
+        // 2. Upload the new image file.
+        const imageRef = ref(storage, `items/${itemId}/${file.name}`);
+        const snapshot = await uploadBytes(imageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        // 3. Safely update the item in the list with the new image URL.
+        const listRef = doc(firestore, 'lists', listId);
+        const listSnap = await getDoc(listRef);
+
+        if (listSnap.exists()) {
+            const currentList = listSnap.data() as List;
+            const updatedItems = currentList.items.map(i => {
+                if (i.id === itemId) {
+                    return { ...i, image: downloadURL }; // Update the image URL
+                }
+                return i;
+            });
+            // Use the existing non-blocking update function to write the changes.
+            updateDocumentNonBlocking(listRef, { items: updatedItems });
+            toast({ title: "Upload Complete!", description: `A new image has been saved.` });
+        } else {
+            throw new Error("List document not found during image URL update.");
+        }
+    } catch (error) {
+        console.error("Background image upload failed:", error);
+        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload and save the image.' });
+    }
+  };
+
   const value: AppContextType = {
     lists, recipes, settings, isDataLoading, currentView, activeTab, urgentMode, generatedRecipe, mergeProposal, users,
     navigate, vibrate, addList, updateList, deleteList, addItemToList, addSmartItemToList, updateItemInList, deleteItemInList,
     toggleItemChecked, setUrgentMode, addRecipe, updateRecipe, deleteRecipe, addRecipeToList, updateSettings, setGeneratedRecipe,
-    clearGeneratedRecipe, confirmMerge, declineMerge, addCollaborator, removeCollaborator
+    clearGeneratedRecipe, confirmMerge, declineMerge, addCollaborator, removeCollaborator, uploadItemImageInBackground
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
