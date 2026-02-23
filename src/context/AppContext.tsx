@@ -4,10 +4,9 @@ import { createContext, useState, useEffect, ReactNode, useCallback, useMemo } f
 import { List, Recipe, Settings, Item, View, GenerateRecipeOutput, MergeProposal, UserProfile } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase, useStorage } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { setDocumentNonBlocking, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc, query, where, getDocs, writeBatch, arrayUnion, getDoc, Firestore } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
@@ -84,13 +83,12 @@ type AppContextType = {
   declineMerge: (keepSeparate?: boolean) => void;
   addCollaborator: (entityType: 'list' | 'recipe', entityId: string, email: string) => Promise<boolean>;
   removeCollaborator: (entityType: 'list' | 'recipe', entityId: string, userId: string) => void;
-  uploadItemImageInBackground: (listId: string, itemId: string, file: File, existingImageUrl?: string) => Promise<void>;
 };
 
 export const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { firestore, storage } = useFirebase();
+  const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
 
@@ -361,17 +359,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const list = lists.find(l => l.id === listId);
     if (!list) return;
 
-    const itemToDelete = list.items.find(item => item.id === itemId);
-
-    // Delete image from storage if it exists
-    if (itemToDelete?.image) {
-      const imageRef = ref(storage, itemToDelete.image);
-      deleteObject(imageRef).catch((error: any) => {
-        console.error("Failed to delete image from storage:", error);
-        toast({ variant: 'destructive', title: 'Image Cleanup Failed', description: `Could not remove the old image file. Reason: ${error.code || 'Unknown'}`})
-      })
-    }
-
     const updatedItems = list.items.filter(item => item.id !== itemId);
     updateDocumentNonBlocking(doc(firestore, 'lists', listId), { items: updatedItems });
   };
@@ -466,64 +453,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const uploadItemImageInBackground = async (listId: string, itemId: string, file: File, existingImageUrl?: string) => {
-    toast({ title: "Uploading image...", description: `Image for item is uploading in the background.` });
-
-    try {
-        // 1. If there's an old image, delete it from storage.
-        if (existingImageUrl) {
-            const oldImageRef = ref(storage, existingImageUrl);
-            await deleteObject(oldImageRef).catch(e => console.warn("Could not delete old image, it may have already been removed.", e));
-        }
-
-        // 2. Upload the new image file.
-        const imageRef = ref(storage, `items/${itemId}/${file.name}`);
-        const snapshot = await uploadBytes(imageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-
-        // 3. Safely update the item in the list with the new image URL.
-        const listRef = doc(firestore, 'lists', listId);
-        const listSnap = await getDoc(listRef);
-
-        if (listSnap.exists()) {
-            const currentList = listSnap.data() as List;
-            const updatedItems = currentList.items.map(i => {
-                if (i.id === itemId) {
-                    return { ...i, image: downloadURL }; // Update the image URL
-                }
-                return i;
-            });
-            // Use the existing non-blocking update function to write the changes.
-            updateDocumentNonBlocking(listRef, { items: updatedItems });
-            toast({ title: "Upload Complete!", description: `A new image has been saved.` });
-        } else {
-            throw new Error("List document not found during image URL update.");
-        }
-    } catch (error: any) {
-        console.error("Background image upload failed:", error);
-        let description = 'Could not upload and save the image.';
-        if (error.code) {
-          switch (error.code) {
-            case 'storage/unauthorized':
-              description = 'Permission denied. This could be due to security rules or a CORS configuration issue on your Firebase project.';
-              break;
-            case 'storage/canceled':
-              description = 'Upload was canceled.';
-              break;
-            case 'storage/unknown':
-              description = 'An unknown error occurred. This might be a network issue or a CORS problem.';
-              break;
-          }
-        }
-        toast({ variant: 'destructive', title: 'Upload Failed', description });
-    }
-  };
-
   const value: AppContextType = {
     lists, recipes, settings, isDataLoading, currentView, activeTab, urgentMode, generatedRecipe, mergeProposal, users,
     navigate, vibrate, addList, updateList, deleteList, addItemToList, addSmartItemToList, updateItemInList, deleteItemInList,
     toggleItemChecked, setUrgentMode, addRecipe, updateRecipe, deleteRecipe, addRecipeToList, updateSettings, setGeneratedRecipe,
-    clearGeneratedRecipe, confirmMerge, declineMerge, addCollaborator, removeCollaborator, uploadItemImageInBackground
+    clearGeneratedRecipe, confirmMerge, declineMerge, addCollaborator, removeCollaborator
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

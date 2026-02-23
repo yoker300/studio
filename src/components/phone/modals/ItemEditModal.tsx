@@ -32,8 +32,6 @@ import { Minus, Plus, Zap, WheatOff, Trash2, Upload, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { useStorage } from '@/firebase';
-import { ref, deleteObject } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 
 const itemSchema = z.object({
@@ -45,7 +43,7 @@ const itemSchema = z.object({
   notes: z.string().optional(),
   urgent: z.boolean(),
   gf: z.boolean(),
-  image: z.string().optional(), // This will hold the existing image URL
+  image: z.string().optional(),
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
@@ -59,15 +57,11 @@ type ItemEditModalProps = {
 
 export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalProps) {
   const context = useContext(AppContext);
-  const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  const itemId = useMemo(() => item?.id || uuidv4(), [item]);
 
   const {
     control,
@@ -99,22 +93,12 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
         });
         setImagePreview(null);
       }
-      setImageFile(null); // Always clear staged file
     }
   }, [item, isOpen, reset]);
 
-  // Clean up blob URL
-  useEffect(() => {
-    return () => {
-        if (imagePreview && imagePreview.startsWith('blob:')) {
-            URL.revokeObjectURL(imagePreview);
-        }
-    };
-  }, [imagePreview]);
-
 
   if (!context) return null;
-  const { addItemToList, updateItemInList, settings, deleteItemInList, uploadItemImageInBackground } = context;
+  const { addItemToList, updateItemInList, settings, deleteItemInList } = context;
 
   const watchedName = watch('name');
   const watchedQty = watch('qty');
@@ -125,102 +109,28 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     (rule) => watchedName.toLowerCase().includes(rule.itemName.toLowerCase())
   );
 
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve, reject) => {
-        const MAX_DIMENSION = 800;
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = document.createElement('img');
-            img.src = event.target?.result as string;
-            img.onload = () => {
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > MAX_DIMENSION) {
-                        height *= MAX_DIMENSION / width;
-                        width = MAX_DIMENSION;
-                    }
-                } else {
-                    if (height > MAX_DIMENSION) {
-                        width *= MAX_DIMENSION / height;
-                        height = MAX_DIMENSION;
-                    }
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-
-                if (!ctx) {
-                    return reject(new Error('Failed to get canvas context'));
-                }
-                ctx.drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob((blob) => {
-                    if (!blob) {
-                        return reject(new Error('Canvas to Blob failed'));
-                    }
-                    const newFile = new File([blob], file.name, {
-                        type: 'image/jpeg',
-                        lastModified: Date.now()
-                    });
-                    resolve(newFile);
-                }, 'image/jpeg', 0.8); // 80% quality
-            };
-            img.onerror = (err) => reject(err);
-        };
-        reader.onerror = (err) => reject(err);
-    });
-  };
-
   const onSubmit = (data: ItemFormData) => {
     setIsSaving(true);
-    const finalItemId = item?.id || itemId;
 
-    // Determine if an existing image was removed by the user
-    const imageWasRemoved = !!(item?.image && !imagePreview);
-
-    // Prepare the main item data for an immediate save.
-    // The image URL will be updated later by the background task if a new one is being uploaded.
     const itemData: Item = {
         ...data,
-        id: finalItemId,
+        id: item?.id || uuidv4(),
         category: item?.category || '',
         checked: item?.checked || false,
-        image: imageWasRemoved ? '' : (item?.image || ''),
     };
 
-    // Immediately save the text-based data.
     if (item) {
         updateItemInList(listId, itemData);
     } else {
         addItemToList(listId, itemData);
     }
-
-    // --- Handle Background Tasks ---
-
-    // 1. If a new file was selected, start the background upload.
-    if (imageFile) {
-        uploadItemImageInBackground(listId, finalItemId, imageFile, item?.image);
-    } 
-    // 2. If an existing image was removed (and no new one was added), delete it from storage.
-    else if (imageWasRemoved && item?.image) {
-        const oldImageRef = ref(storage, item.image);
-        deleteObject(oldImageRef).catch((err: any) => {
-            console.error("Failed to delete old image from storage", err);
-            toast({ variant: 'destructive', title: "Image Cleanup Failed", description: `Could not remove the old image file. Reason: ${err.code || 'Unknown'}` });
-        });
-    }
-
-    onClose(); // Close the modal immediately.
+    
+    setIsSaving(false);
+    onClose();
   };
 
   const handleDeleteItem = async () => {
     if (item) {
-      // The deleteItemInList function in context already handles deleting the storage object.
       deleteItemInList(listId, item.id);
       toast({ title: "Item Deleted", description: `"${item.name}" has been removed.`});
       onClose();
@@ -231,43 +141,22 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     fileInputRef.current?.click();
   };
 
-  const handleImageInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(imagePreview);
-    }
-
-    toast({ title: "Compressing image..." });
-
-    try {
-        const compressedFile = await compressImage(file);
-        const previewUrl = URL.createObjectURL(compressedFile);
-        setImagePreview(previewUrl);
-        setImageFile(compressedFile);
-        toast({ title: "Image ready for upload!" });
-    } catch (error) {
-        console.error("Image compression failed:", error);
-        toast({
-            variant: "destructive",
-            title: "Compression Failed",
-            description: "Could not compress the image. The original file will be used.",
-        });
-        // Fallback to original file
-        const previewUrl = URL.createObjectURL(file);
-        setImagePreview(previewUrl);
-        setImageFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        setImagePreview(dataUrl);
+        setValue('image', dataUrl, { shouldValidate: true });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleImageRemove = () => {
-    // Just update the UI state. `onSubmit` will handle the actual deletion.
-    if (imagePreview?.startsWith('blob:')) {
-        URL.revokeObjectURL(imagePreview);
-    }
     setImagePreview(null);
-    setImageFile(null);
+    setValue('image', '', { shouldValidate: true });
   };
 
 
