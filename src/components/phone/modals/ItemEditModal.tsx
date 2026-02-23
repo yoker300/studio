@@ -209,9 +209,9 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
     // 2. If an existing image was removed (and no new one was added), delete it from storage.
     else if (imageWasRemoved && item?.image) {
         const oldImageRef = ref(storage, item.image);
-        deleteObject(oldImageRef).catch(err => {
+        deleteObject(oldImageRef).catch((err: any) => {
             console.error("Failed to delete old image from storage", err);
-            toast({ variant: 'destructive', title: "Image Cleanup Failed", description: "Could not remove the old image file." });
+            toast({ variant: 'destructive', title: "Image Cleanup Failed", description: `Could not remove the old image file. Reason: ${err.code || 'Unknown'}` });
         });
     }
 

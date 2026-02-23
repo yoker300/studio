@@ -366,9 +366,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Delete image from storage if it exists
     if (itemToDelete?.image) {
       const imageRef = ref(storage, itemToDelete.image);
-      deleteObject(imageRef).catch(error => {
+      deleteObject(imageRef).catch((error: any) => {
         console.error("Failed to delete image from storage:", error);
-        toast({ variant: 'destructive', title: 'Cleanup Failed', description: 'Could not remove the old image file.'})
+        toast({ variant: 'destructive', title: 'Image Cleanup Failed', description: `Could not remove the old image file. Reason: ${error.code || 'Unknown'}`})
       })
     }
 
@@ -499,9 +499,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
             throw new Error("List document not found during image URL update.");
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Background image upload failed:", error);
-        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload and save the image.' });
+        let description = 'Could not upload and save the image.';
+        if (error.code) {
+          switch (error.code) {
+            case 'storage/unauthorized':
+              description = 'Permission denied. This could be due to security rules or a CORS configuration issue on your Firebase project.';
+              break;
+            case 'storage/canceled':
+              description = 'Upload was canceled.';
+              break;
+            case 'storage/unknown':
+              description = 'An unknown error occurred. This might be a network issue or a CORS problem.';
+              break;
+          }
+        }
+        toast({ variant: 'destructive', title: 'Upload Failed', description });
     }
   };
 
