@@ -108,6 +108,7 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
   const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showPhotoChoice, setShowPhotoChoice] = useState(false);
   
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -195,10 +196,6 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
       toast({ title: "Item Deleted", description: `"${item.name}" has been removed.`});
       onClose();
     }
-  };
-
-  const handleImageUploadClick = () => {
-    fileInputRef.current?.click();
   };
 
   const handleImageInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -336,15 +333,11 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <Button type="button" variant="outline" className="w-full" onClick={handleImageUploadClick} disabled={isCompressing}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    {isCompressing ? 'Compressing...' : 'Upload'}
-                  </Button>
-                   <Button type="button" variant="outline" className="w-full" onClick={() => cameraInputRef.current?.click()} disabled={isCompressing}>
-                    <Camera className="mr-2 h-4 w-4" />
-                    {isCompressing ? '...' : 'Take Photo'}
-                  </Button>
+                <div className="mt-2">
+                    <Button type="button" variant="outline" className="w-full" onClick={() => setShowPhotoChoice(true)} disabled={isCompressing}>
+                        <Camera className="mr-2 h-4 w-4" />
+                        {isCompressing ? 'Compressing...' : 'Add Photo'}
+                    </Button>
                 </div>
               )}
             </div>
@@ -353,6 +346,44 @@ export function ItemEditModal({ isOpen, onClose, item, listId }: ItemEditModalPr
             <Textarea {...control.register('notes')} placeholder="Notes (e.g., Brand X, low fat)..." rows={2} className="rtl:text-right" />
 
           </div>
+
+          <AlertDialog open={showPhotoChoice} onOpenChange={setShowPhotoChoice}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Add a Photo</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Choose a source for your item's picture.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="grid gap-2 pt-4">
+                    <Button
+                        type="button"
+                        onClick={() => {
+                        cameraInputRef.current?.click();
+                        setShowPhotoChoice(false);
+                        }}
+                    >
+                        <Camera className="mr-2 h-4 w-4" />
+                        Take Photo with Camera
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                        fileInputRef.current?.click();
+                        setShowPhotoChoice(false);
+                        }}
+                    >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Choose from Library
+                    </Button>
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
 
           <DialogFooter className="mt-4 flex flex-row justify-between items-center">
             <div>
